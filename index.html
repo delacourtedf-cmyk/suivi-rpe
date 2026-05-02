@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RPE Suivi">
+<meta name="theme-color" content="#1a56db">
+<title>RPE & Suivi de Charge</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#1a56db;--primary-dark:#1340b0;--secondary:#f59e0b;
+  --success:#10b981;--danger:#ef4444;--warning:#f97316;
+  --bg:#f0f4ff;--card:#fff;--text:#1e293b;--muted:#64748b;--border:#e2e8f0;
+  --radius:14px;--shadow:0 2px 12px rgba(0,0,0,0.07);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overscroll-behavior:none}
+.screen{display:none;min-height:100vh;padding:20px 16px 90px;max-width:520px;margin:0 auto}
+.screen.active{display:flex;flex-direction:column}
+.header{display:flex;align-items:center;gap:12px;margin-bottom:22px;padding-bottom:14px;border-bottom:2px solid var(--primary)}
+.header h1{font-size:1.3rem;font-weight:800;color:var(--primary)}
+.back-btn{background:none;border:none;font-size:1.6rem;cursor:pointer;color:var(--primary);padding:4px;line-height:1;flex-shrink:0}
+.card{background:var(--card);border-radius:var(--radius);padding:18px;margin-bottom:14px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.card h3{font-size:1rem;font-weight:700;margin-bottom:12px}
+.btn{display:block;width:100%;padding:15px;border-radius:12px;border:none;font-size:1rem;font-weight:700;cursor:pointer;transition:.2s;text-align:center}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:active{background:var(--primary-dark)}
+.btn-secondary{background:var(--secondary);color:#fff}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-outline{background:transparent;border:2px solid var(--primary);color:var(--primary)}
+.btn-sm{padding:9px 14px;width:auto;font-size:.85rem;border-radius:10px}
+.btn-ghost{background:var(--bg);border:1px solid var(--border);color:var(--text)}
+.mb-8{margin-bottom:8px}.mb-12{margin-bottom:12px}.mb-16{margin-bottom:16px}.mt-8{margin-top:8px}.mt-12{margin-top:12px}.mt-16{margin-top:16px}
+.flex{display:flex}.flex-between{display:flex;justify-content:space-between;align-items:center}.gap-8{gap:8px}.gap-12{gap:12px}
+.text-muted{color:var(--muted);font-size:.85rem}.text-center{text-align:center}.bold{font-weight:700}
+.hidden{display:none!important}
+
+/* HERO */
+.hero{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:88vh;text-align:center;gap:18px}
+.hero-logo{font-size:4.5rem;filter:drop-shadow(0 4px 8px rgba(26,86,219,.2))}
+.hero h1{font-size:2rem;font-weight:900;color:var(--primary);line-height:1.1}
+.hero p{color:var(--muted);font-size:.95rem}
+.hero-buttons{display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px}
+
+/* PLAYER LIST */
+.player-item{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--card);border-radius:12px;margin-bottom:10px;border:1.5px solid var(--border);cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.player-item:active{border-color:var(--primary);background:#eff6ff;transform:scale(.99)}
+.player-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#5b21b6);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;flex-shrink:0}
+
+/* STATUS DOTS */
+.status-row{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
+.status-pill{padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:600}
+.pill-done{background:#d1fae5;color:#065f46}
+.pill-pending{background:#fef3c7;color:#92400e}
+.pill-na{background:#f1f5f9;color:#64748b}
+
+/* PROGRESS */
+.progress-wrap{margin-bottom:20px}
+.progress-meta{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted);margin-bottom:6px}
+.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),#7c3aed);border-radius:4px;transition:width .35s cubic-bezier(.4,0,.2,1)}
+
+/* QUESTIONS */
+.question{margin-bottom:20px;padding:16px;background:var(--card);border-radius:var(--radius);border:1.5px solid var(--border);box-shadow:var(--shadow);transition:.2s}
+.question.answered{border-color:var(--success)}
+.question-label{font-size:1rem;font-weight:700;margin-bottom:10px;line-height:1.35}
+.question-hint{font-size:.75rem;color:var(--muted);margin-bottom:10px;font-style:italic}
+
+/* BORG */
+.borg-scale{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:2px}
+.borg-btn{padding:11px 4px;border-radius:10px;border:2px solid var(--border);background:#fafafa;font-size:1rem;font-weight:800;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.borg-btn:active{transform:scale(.93)}
+.borg-btn.selected{color:#fff;border-color:transparent;transform:scale(1.04)}
+.borg-btn[data-val="0"].selected{background:#94a3b8}
+.borg-btn[data-val="1"].selected,.borg-btn[data-val="2"].selected{background:#10b981}
+.borg-btn[data-val="3"].selected,.borg-btn[data-val="4"].selected{background:#84cc16}
+.borg-btn[data-val="5"].selected,.borg-btn[data-val="6"].selected{background:#f59e0b}
+.borg-btn[data-val="7"].selected,.borg-btn[data-val="8"].selected{background:#f97316}
+.borg-btn[data-val="9"].selected,.borg-btn[data-val="10"].selected{background:#ef4444}
+
+/* YES/NO */
+.yn-group{display:flex;gap:10px;margin-top:2px}
+.yn-btn{flex:1;padding:13px;border-radius:10px;border:2px solid var(--border);background:#fafafa;font-size:.95rem;font-weight:700;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.yn-btn:active{transform:scale(.96)}
+.yn-btn.yes.selected{background:var(--success);color:#fff;border-color:var(--success)}
+.yn-btn.no.selected{background:var(--danger);color:#fff;border-color:var(--danger)}
+
+/* TEXTAREA */
+.comment-area{width:100%;padding:12px;border-radius:10px;border:2px solid var(--border);font-size:.9rem;font-family:inherit;resize:vertical;min-height:70px;transition:.2s;outline:none}
+.comment-area:focus{border-color:var(--primary)}
+
+/* PIN */
+.pin-input{display:flex;gap:14px;justify-content:center;margin:24px 0}
+.pin-digit{width:58px;height:68px;border:2.5px solid var(--border);border-radius:12px;font-size:1.6rem;text-align:center;font-weight:800;outline:none;transition:.2s}
+.pin-digit:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,86,219,.15)}
+
+/* TABS */
+.tabs{display:flex;gap:4px;background:var(--border);border-radius:12px;padding:4px;margin-bottom:18px}
+.tab{flex:1;padding:11px 6px;border-radius:9px;border:none;background:transparent;font-size:.8rem;font-weight:700;cursor:pointer;color:var(--muted);transition:.2s}
+.tab.active{background:#fff;color:var(--primary);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+
+/* BADGES */
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:.72rem;font-weight:700}
+.badge-green{background:#d1fae5;color:#065f46}
+.badge-red{background:#fee2e2;color:#991b1b}
+.badge-yellow{background:#fef3c7;color:#92400e}
+.badge-blue{background:#dbeafe;color:#1e40af}
+.badge-purple{background:#ede9fe;color:#5b21b6}
+
+/* STAT GRID */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px}
+.stat-card{background:var(--card);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--border);box-shadow:var(--shadow)}
+.stat-value{font-size:2rem;font-weight:900;color:var(--primary)}
+.stat-label{font-size:.72rem;color:var(--muted);margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+
+/* TABLE */
+.report-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.report-table th{text-align:left;padding:7px 9px;background:var(--bg);color:var(--muted);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.report-table td{padding:10px 9px;border-bottom:1px solid var(--border);vertical-align:middle}
+.report-table tbody tr:last-child td{border-bottom:none}
+.report-table tbody tr:hover td{background:#f8fafc}
+
+/* RPE COLORS */
+.rpe-0{color:#94a3b8;font-weight:700}
+.rpe-1,.rpe-2{color:#10b981;font-weight:700}
+.rpe-3,.rpe-4{color:#84cc16;font-weight:700}
+.rpe-5,.rpe-6{color:#f59e0b;font-weight:700}
+.rpe-7,.rpe-8{color:#f97316;font-weight:700}
+.rpe-9,.rpe-10{color:#ef4444;font-weight:700}
+
+/* FORM */
+.form-group{margin-bottom:14px}
+.form-label{font-size:.85rem;font-weight:700;margin-bottom:6px;display:block;color:var(--muted)}
+.form-input{width:100%;padding:11px 13px;border-radius:10px;border:2px solid var(--border);font-size:.95rem;outline:none;transition:.2s;font-family:inherit}
+.form-input:focus{border-color:var(--primary)}
+.form-select{width:100%;padding:11px 13px;border-radius:10px;border:2px solid var(--border);font-size:.95rem;background:#fff;font-family:inherit}
+
+/* TOGGLE DAYS */
+.toggle-group{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}
+.toggle-day{padding:8px 11px;border-radius:8px;border:2px solid var(--border);background:#fff;font-size:.82rem;font-weight:700;cursor:pointer;transition:.15s}
+.toggle-day.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* ALERT */
+.alert{padding:12px 14px;border-radius:10px;margin-bottom:14px;font-size:.88rem}
+.alert-info{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe}
+.alert-success{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0}
+.alert-warning{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+
+/* SUCCESS */
+.success-anim{text-align:center;padding:40px 20px}
+.success-anim .check{font-size:5rem;animation:bounceIn .5s ease}
+@keyframes bounceIn{0%{transform:scale(0)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+
+/* MINI CHART */
+.mini-chart-wrap{display:flex;gap:5px;align-items:flex-end;height:70px;padding:4px 0}
+.mini-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.mini-bar{width:100%;border-radius:4px 4px 0 0;min-height:3px;transition:.3s}
+.mini-label{font-size:.6rem;color:var(--muted)}
+.mini-val{font-size:.65rem;font-weight:800}
+
+/* QUESTION EDITOR */
+.q-editor-item{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px}
+.q-editor-handle{cursor:grab;color:var(--muted);margin-right:8px}
+.q-type-chip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:700;margin-left:8px}
+.chip-borg{background:#dbeafe;color:#1e40af}
+.chip-yn{background:#d1fae5;color:#065f46}
+.chip-text{background:#ede9fe;color:#5b21b6}
+.chip-borg0{background:#f1f5f9;color:#475569}
+
+/* NOTIF BADGE */
+.notif-badge{position:absolute;top:-4px;right:-4px;background:var(--danger);color:#fff;border-radius:50%;width:18px;height:18px;font-size:.65rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+
+/* SEPARATOR */
+.separator{height:1px;background:var(--border);margin:12px 0}
+
+@media(prefers-color-scheme:dark){
+  :root{--bg:#0f172a;--card:#1e293b;--text:#f1f5f9;--muted:#94a3b8;--border:#334155}
+  .borg-btn{background:#1e293b}.yn-btn{background:#1e293b}
+  .form-input,.form-select{background:#1e293b;color:#f1f5f9}
+  .comment-area{background:#1e293b;color:#f1f5f9}
+}
+</style>
+</head>
+<body>
+
+<!-- ======== HOME ======== -->
+<div id="screen-home" class="screen active">
+  <div class="hero">
+    <div class="hero-logo">🏐</div>
+    <h1>RPE &amp; Suivi<br>de Charge</h1>
+    <p>Monitoring de la charge d'entraînement</p>
+    <div class="hero-buttons">
+      <button class="btn btn-primary" onclick="goToPlayerSelect()">Je suis une joueuse</button>
+      <button class="btn btn-outline" onclick="goToStaffLogin()">Accès Staff</button>
+    </div>
+    <p class="text-muted" style="font-size:.72rem;margin-top:8px" id="notif-status-home"></p>
+  </div>
+</div>
+
+<!-- ======== PLAYER SELECT ======== -->
+<div id="screen-player-select" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <h1>Qui êtes-vous ?</h1>
+  </div>
+  <div id="player-list-container"></div>
+  <p class="text-muted text-center mt-16">Sélectionnez votre nom pour remplir votre questionnaire</p>
+</div>
+
+<!-- ======== QUEST CHOICE ======== -->
+<div id="screen-quest-choice" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('player-select')">←</button>
+    <h1 id="choice-player-name">Bonjour</h1>
+  </div>
+  <div id="quest-choice-content"></div>
+</div>
+
+<!-- ======== QUESTIONNAIRE ======== -->
+<div id="screen-questionnaire" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('quest-choice')">←</button>
+    <div>
+      <h1 id="quest-title">Questionnaire</h1>
+      <p class="text-muted" id="quest-subtitle"></p>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-meta">
+      <span id="quest-progress-label">Question 0/0</span>
+      <span id="quest-progress-pct">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="quest-progress" style="width:0%"></div></div>
+  </div>
+  <div id="quest-questions-container"></div>
+  <button class="btn btn-success mt-16 hidden" id="btn-submit" onclick="submitQuestionnaire()">✓ Envoyer mes réponses</button>
+</div>
+
+<!-- ======== SUCCESS ======== -->
+<div id="screen-success" class="screen">
+  <div class="success-anim">
+    <div class="check">✅</div>
+    <h2 style="margin-top:16px;color:var(--success);font-size:1.5rem">Merci !</h2>
+    <p class="text-muted mt-8" id="success-message">Réponses enregistrées.</p>
+    <button class="btn btn-primary mt-16" style="max-width:260px;margin:24px auto 0" onclick="showScreen('home')">Retour à l'accueil</button>
+  </div>
+</div>
+
+<!-- ======== STAFF LOGIN ======== -->
+<div id="screen-staff-login" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <h1>Accès Staff</h1>
+  </div>
+  <div class="card">
+    <p class="text-muted mb-12">Entrez votre code PIN (4 chiffres)</p>
+    <div class="pin-input">
+      <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p1" oninput="pinMove(this,'p2')" onkeydown="pinDel(event,this,null)">
+      <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p2" oninput="pinMove(this,'p3')" onkeydown="pinDel(event,this,'p1')">
+      <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3" oninput="pinMove(this,'p4')" onkeydown="pinDel(event,this,'p2')">
+      <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p4" oninput="pinMove(this,null)" onkeydown="pinDel(event,this,'p3')">
+    </div>
+    <div id="pin-error" class="alert alert-warning hidden">Code incorrect. Réessayez.</div>
+    <button class="btn btn-primary" onclick="checkPin()">Se connecter</button>
+  </div>
+  <p class="text-muted text-center mt-16" style="font-size:.75rem">PIN par défaut : <strong>1234</strong> (modifiable dans les paramètres)</p>
+</div>
+
+<!-- ======== DASHBOARD ======== -->
+<div id="screen-dashboard" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <div>
+      <h1>Tableau de Bord</h1>
+      <p class="text-muted" id="dash-date-label"></p>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('rapport')">📊 Rapport</button>
+    <button class="tab" onclick="switchTab('joueuses')">👥 Joueuses</button>
+    <button class="tab" onclick="switchTab('config')">⚙️ Config</button>
+  </div>
+
+  <!-- TAB RAPPORT -->
+  <div id="tab-rapport">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+      <input type="date" id="dash-date-input" class="form-input" style="flex:1;padding:8px 10px;font-size:.85rem" onchange="loadDashboard()">
+      <button class="btn btn-sm btn-ghost" onclick="setDashboardDate(0)">Aujourd'hui</button>
+    </div>
+    <div class="stat-grid" id="dash-stats"></div>
+    <div class="card">
+      <h3>🌅 Bien-être Matinal</h3>
+      <div id="morning-table-wrap" style="overflow-x:auto"></div>
+    </div>
+    <div class="card">
+      <h3>💪 Charge des Séances</h3>
+      <div id="training-table-wrap" style="overflow-x:auto"></div>
+    </div>
+    <div class="card">
+      <h3 class="mb-8">⚠️ Alertes du jour</h3>
+      <div id="alerts-wrap"></div>
+    </div>
+  </div>
+
+  <!-- TAB JOUEUSES -->
+  <div id="tab-joueuses" class="hidden">
+    <div id="joueuses-list"></div>
+  </div>
+
+  <!-- TAB CONFIG -->
+  <div id="tab-config" class="hidden">
+
+    <!-- Ajouter joueuse -->
+    <div class="card">
+      <h3 class="mb-12">➕ Ajouter une joueuse</h3>
+      <div class="form-group">
+        <label class="form-label">Nom complet</label>
+        <input type="text" id="new-name" class="form-input" placeholder="Marie Dupont">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Heure questionnaire matin (par défaut 08:00)</label>
+        <input type="time" id="new-morning" class="form-input" value="08:00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Jours d'entraînement</label>
+        <div class="toggle-group" id="new-days">
+          <button class="toggle-day" data-day="lundi">Lun</button>
+          <button class="toggle-day" data-day="mardi">Mar</button>
+          <button class="toggle-day" data-day="mercredi">Mer</button>
+          <button class="toggle-day" data-day="jeudi">Jeu</button>
+          <button class="toggle-day" data-day="vendredi">Ven</button>
+          <button class="toggle-day" data-day="samedi">Sam</button>
+          <button class="toggle-day" data-day="dimanche">Dim</button>
+        </div>
+      </div>
+      <div id="days-detail"></div>
+      <button class="btn btn-primary mt-8" onclick="addPlayer()">Ajouter</button>
+    </div>
+
+    <!-- Liste joueuses -->
+    <div class="card">
+      <h3 class="mb-12">👥 Joueuses enregistrées</h3>
+      <div id="players-list-config"></div>
+    </div>
+
+    <!-- Éditeur de questions -->
+    <div class="card">
+      <h3 class="mb-8">📝 Questions — Bien-être Matinal</h3>
+      <p class="text-muted mb-12" style="font-size:.8rem">Modifiez, activez/désactivez ou ajoutez des questions. Le commentaire final est toujours présent.</p>
+      <div id="morning-q-editor"></div>
+      <button class="btn btn-ghost btn-sm mt-8" onclick="addQuestion('morning')">+ Ajouter une question</button>
+    </div>
+
+    <div class="card">
+      <h3 class="mb-8">📝 Questions — Charge de Séance</h3>
+      <p class="text-muted mb-12" style="font-size:.8rem">Le commentaire final est toujours présent.</p>
+      <div id="training-q-editor"></div>
+      <button class="btn btn-ghost btn-sm mt-8" onclick="addQuestion('training')">+ Ajouter une question</button>
+    </div>
+
+    <!-- Sécurité & Export -->
+    <div class="card">
+      <h3 class="mb-12">🔐 Changer le PIN</h3>
+      <div class="form-group">
+        <input type="password" id="new-pin" class="form-input" maxlength="4" inputmode="numeric" placeholder="Nouveau PIN (4 chiffres)">
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="changePin()">Modifier le PIN</button>
+    </div>
+    <div class="card">
+      <h3 class="mb-12">📤 Export des données</h3>
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Télécharger CSV</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== PLAYER REPORT ======== -->
+<div id="screen-player-report" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('dashboard')">←</button>
+    <div>
+      <h1 id="pr-name"></h1>
+      <p class="text-muted">Rapport individuel</p>
+    </div>
+  </div>
+  <div id="pr-content"></div>
+</div>
+
+<script>
+/* ==========================================================
+   DATABASE (LocalStorage)
+   ========================================================== */
+const DB = {
+  get(k, d=null){ try{ return JSON.parse(localStorage.getItem(k))??d }catch{ return d } },
+  set(k,v){ localStorage.setItem(k,JSON.stringify(v)) }
+};
+const getPlayers  = ()=>DB.get('players',[]);
+const getResponses= ()=>DB.get('responses',[]);
+const getSettings = ()=>DB.get('settings',{pin:'1234',notif:false});
+const getQConfig  = ()=>DB.get('qconfig', DEFAULT_QCONFIG());
+
+/* ==========================================================
+   DEFAULT QUESTION CONFIG
+   ========================================================== */
+function DEFAULT_QCONFIG(){
+  return {
+    morning:[
+      {id:'q_sleep',   active:true, label:'Qualité du sommeil ?',                      type:'borg',  hint:'1 = très mauvais → 10 = excellent'},
+      {id:'q_fatigue', active:true, label:'Niveau de fatigue / énergie ?',              type:'borg',  hint:'1 = épuisé(e) → 10 = très reposé(e)'},
+      {id:'q_pain',    active:true, label:'Avez-vous des douleurs physiques ?',          type:'yn',    hint:''},
+      {id:'q_mood',    active:true, label:'Humeur générale ?',                           type:'borg',  hint:'1 = très mauvaise → 10 = excellente'},
+      {id:'q_period',  active:true, label:'Jour de règle ? (0 = non, 1-10 = intensité)',type:'borg0', hint:'0 = pas de règle, 1 = léger → 10 = très douloureux'},
+    ],
+    training:[
+      {id:'q_rpe',          active:true, label:'Intensité perçue de la séance (RPE) ?',   type:'borg', hint:'1 = très légère → 10 = maximale'},
+      {id:'q_session_score',active:true, label:'Note globale de la séance ?',             type:'borg', hint:'1 = très mauvaise → 10 = excellente'},
+    ]
+  };
+}
+
+/* ==========================================================
+   STATE
+   ========================================================== */
+let currentPlayer   = null;
+let currentQType    = null;
+let questAnswers    = {};
+let reminderTimers  = {};
+
+/* ==========================================================
+   NAVIGATION
+   ========================================================== */
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  window.scrollTo(0,0);
+}
+function goToPlayerSelect(){
+  renderPlayerList();
+  showScreen('player-select');
+}
+function goToStaffLogin(){
+  ['p1','p2','p3','p4'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pin-error').classList.add('hidden');
+  showScreen('staff-login');
+}
+
+/* ==========================================================
+   PLAYER LIST
+   ========================================================== */
+function renderPlayerList(){
+  const players = getPlayers();
+  const c = document.getElementById('player-list-container');
+  const today = todayKey();
+  const responses = getResponses();
+  const days7 = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const todayName = days7[new Date().getDay()];
+
+  if(!players.length){
+    c.innerHTML=`<div class="alert alert-info">Aucune joueuse configurée. Le staff doit d'abord les ajouter dans la configuration.</div>`;
+    return;
+  }
+  c.innerHTML = players.map(p=>{
+    const mDone = responses.some(r=>r.playerId===p.id&&r.date===today&&r.type==='morning');
+    const tDone = responses.some(r=>r.playerId===p.id&&r.date===today&&r.type==='training');
+    const hasT  = p.trainingDays?.[todayName]?.active;
+    const sType = p.trainingDays?.[todayName]?.type==='physique'?'🏋️':'🏐';
+    return `
+    <div class="player-item" onclick="selectPlayer('${p.id}')">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="player-avatar">${p.name.charAt(0).toUpperCase()}</div>
+        <div>
+          <div class="bold">${p.name}</div>
+          <div class="status-row">
+            <span class="status-pill ${mDone?'pill-done':'pill-pending'}">${mDone?'✓':'○'} Matin</span>
+            ${hasT?`<span class="status-pill ${tDone?'pill-done':'pill-pending'}">${tDone?'✓':'○'} ${sType} Séance</span>`:`<span class="status-pill pill-na">Pas d'entraînement</span>`}
+          </div>
+        </div>
+      </div>
+      <span style="color:var(--muted);font-size:1.2rem">›</span>
+    </div>`;
+  }).join('');
+}
+
+function selectPlayer(pid){
+  currentPlayer = getPlayers().find(p=>p.id===pid);
+  if(!currentPlayer) return;
+  const today = todayKey();
+  const resp  = getResponses();
+  const days7 = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const todayName = days7[new Date().getDay()];
+  const mDone = resp.some(r=>r.playerId===pid&&r.date===today&&r.type==='morning');
+  const tDone = resp.some(r=>r.playerId===pid&&r.date===today&&r.type==='training');
+  const hasT  = currentPlayer.trainingDays?.[todayName]?.active;
+  const opts  = [];
+  if(!mDone) opts.push('morning');
+  if(hasT&&!tDone) opts.push('training');
+
+  if(!opts.length){
+    document.getElementById('success-message').textContent=`Tous vos questionnaires du jour sont déjà remplis. Merci ${firstName(currentPlayer.name)} ! 🎉`;
+    showScreen('success');
+    return;
+  }
+  if(opts.length===1){ startQuestionnaire(opts[0]); return; }
+
+  // choice screen
+  const days7FR = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const sType = currentPlayer.trainingDays?.[todayName]?.type;
+  const sIcon = sType==='physique'?'🏋️':'🏐';
+  const sLabel = sType==='physique'?'Séance Physique':'Séance Volley';
+  document.getElementById('choice-player-name').textContent = `Bonjour ${firstName(currentPlayer.name)} 👋`;
+  document.getElementById('quest-choice-content').innerHTML = `
+    <div class="card">
+      <p class="text-muted mb-16">Quel questionnaire souhaitez-vous remplir ?</p>
+      <button class="btn btn-primary mb-12" onclick="startQuestionnaire('morning')">🌅 Bien-être Matinal</button>
+      <button class="btn btn-secondary" onclick="startQuestionnaire('training')">${sIcon} Charge — ${sLabel}</button>
+    </div>`;
+  showScreen('quest-choice');
+}
+
+/* ==========================================================
+   QUESTIONNAIRE
+   ========================================================== */
+function startQuestionnaire(type){
+  currentQType  = type;
+  questAnswers  = {};
+  const qcfg    = getQConfig();
+  const activeQs = qcfg[type].filter(q=>q.active);
+  const days7   = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const todayN  = days7[new Date().getDay()];
+  const sType   = currentPlayer?.trainingDays?.[todayN]?.type;
+
+  const title   = type==='morning'?'🌅 Bien-être Matinal': (sType==='physique'?'🏋️ Séance Physique':'🏐 Séance Volley');
+  const sub     = type==='morning'?new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}):'Charge d\'entraînement';
+  document.getElementById('quest-title').textContent = title;
+  document.getElementById('quest-subtitle').textContent = sub;
+  renderQuestions(activeQs);
+  showScreen('questionnaire');
+}
+
+function renderQuestions(qs){
+  const c = document.getElementById('quest-questions-container');
+  c.innerHTML = qs.map((q,i)=>`
+    <div class="question" id="qblock-${q.id}">
+      <div class="question-label">${i+1}. ${q.label}</div>
+      ${q.hint?`<div class="question-hint">${q.hint}</div>`:''}
+      ${q.type==='borg'  ? renderBorg(q.id,1,10)  : ''}
+      ${q.type==='borg0' ? renderBorg(q.id,0,10)  : ''}
+      ${q.type==='yn'    ? renderYN(q.id)          : ''}
+    </div>
+  `).join('') + `
+    <div class="question" id="qblock-comment">
+      <div class="question-label">${qs.length+1}. Commentaire (optionnel)</div>
+      <textarea class="comment-area" id="quest-comment" placeholder="Remarque libre, douleur précise, contexte…" oninput="updateProgress(${qs.length})"></textarea>
+    </div>`;
+  document.getElementById('btn-submit').classList.add('hidden');
+  updateProgress(qs.length);
+}
+
+function renderBorg(qid, min, max){
+  const vals = Array.from({length:max-min+1},(_,i)=>i+min);
+  const cols = vals.length<=6?vals.length:5;
+  return `<div class="borg-scale" style="grid-template-columns:repeat(${cols},1fr)">
+    ${vals.map(v=>`<button class="borg-btn" data-val="${v}" data-qid="${qid}" onclick="selectBorg('${qid}',${v})">${v}</button>`).join('')}
+  </div>`;
+}
+function renderYN(qid){
+  return `<div class="yn-group">
+    <button class="yn-btn yes" data-qid="${qid}" onclick="selectYN('${qid}',true)">✅ Oui</button>
+    <button class="yn-btn no"  data-qid="${qid}" onclick="selectYN('${qid}',false)">❌ Non</button>
+  </div>`;
+}
+function selectBorg(qid,val){
+  questAnswers[qid]=val;
+  document.querySelectorAll(`.borg-btn[data-qid="${qid}"]`).forEach(b=>{
+    b.classList.toggle('selected',parseInt(b.dataset.val)===val);
+  });
+  document.getElementById('qblock-'+qid)?.classList.add('answered');
+  const qcfg = getQConfig();
+  updateProgress(qcfg[currentQType].filter(q=>q.active).length);
+}
+function selectYN(qid,val){
+  questAnswers[qid]=val;
+  document.querySelectorAll(`.yn-btn[data-qid="${qid}"]`).forEach(b=>b.classList.remove('selected'));
+  const cls = val?'yes':'no';
+  document.querySelector(`.yn-btn.${cls}[data-qid="${qid}"]`).classList.add('selected');
+  document.getElementById('qblock-'+qid)?.classList.add('answered');
+  const qcfg = getQConfig();
+  updateProgress(qcfg[currentQType].filter(q=>q.active).length);
+}
+function updateProgress(total){
+  const answered = Object.keys(questAnswers).length;
+  const pct = total>0 ? Math.round((answered/total)*100) : 100;
+  document.getElementById('quest-progress').style.width = pct+'%';
+  document.getElementById('quest-progress-label').textContent = `Question ${answered}/${total}`;
+  document.getElementById('quest-progress-pct').textContent = pct+'%';
+  document.getElementById('btn-submit').classList.toggle('hidden', answered<total);
+}
+function submitQuestionnaire(){
+  const qcfg = getQConfig();
+  const activeQs = qcfg[currentQType].filter(q=>q.active);
+  if(Object.keys(questAnswers).length < activeQs.length){alert('Veuillez répondre à toutes les questions.');return;}
+  const days7 = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const todayN = days7[new Date().getDay()];
+  const sType = currentPlayer?.trainingDays?.[todayN]?.type||'volley';
+  const comment = document.getElementById('quest-comment')?.value?.trim()||'';
+  const resp = {
+    id: Date.now().toString(),
+    playerId: currentPlayer.id,
+    playerName: currentPlayer.name,
+    date: todayKey(),
+    type: currentQType,
+    sessionType: currentQType==='training'?sType:null,
+    answers: {...questAnswers},
+    comment,
+    timestamp: new Date().toISOString()
+  };
+  const all = getResponses();
+  all.push(resp);
+  DB.set('responses',all);
+  cancelReminder(currentPlayer.id, currentQType);
+  const typeLabel = currentQType==='morning'?'Bien-être Matinal':'Charge de Séance';
+  document.getElementById('success-message').textContent = `"${typeLabel}" enregistré. Merci ${firstName(currentPlayer.name)} ! 🎉`;
+  showScreen('success');
+}
+
+/* ==========================================================
+   STAFF PIN
+   ========================================================== */
+function pinMove(inp,nextId){
+  if(inp.value.length===1&&nextId) document.getElementById(nextId).focus();
+  if(!nextId) checkPin();
+}
+function pinDel(e,inp,prevId){
+  if(e.key==='Backspace'&&inp.value===''&&prevId) document.getElementById(prevId).focus();
+}
+function checkPin(){
+  const pin = ['p1','p2','p3','p4'].map(id=>document.getElementById(id).value).join('');
+  if(pin===getSettings().pin){
+    showScreen('dashboard');
+    setDashboardDate(0);
+    loadDashboard();
+    renderConfigTab();
+  } else if(pin.length===4){
+    document.getElementById('pin-error').classList.remove('hidden');
+    ['p1','p2','p3','p4'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('p1').focus();
+  }
+}
+
+/* ==========================================================
+   DASHBOARD
+   ========================================================== */
+let dashDate = todayKey();
+function setDashboardDate(offsetDays){
+  const d = new Date();
+  d.setDate(d.getDate()+offsetDays);
+  dashDate = d.toISOString().split('T')[0];
+  document.getElementById('dash-date-input').value = dashDate;
+  loadDashboard();
+}
+function switchTab(tab){
+  ['rapport','joueuses','config'].forEach(t=>{
+    document.getElementById('tab-'+t).classList.toggle('hidden',t!==tab);
+  });
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    t.classList.toggle('active',['rapport','joueuses','config'][i]===tab);
+  });
+  if(tab==='joueuses') renderJoueusesTab();
+  if(tab==='config')   renderConfigTab();
+}
+function loadDashboard(){
+  dashDate = document.getElementById('dash-date-input').value || todayKey();
+  const dateStr = new Date(dashDate+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('dash-date-label').textContent = dateStr;
+  renderDashStats();
+  renderMorningTable();
+  renderTrainingTable();
+  renderAlerts();
+}
+function renderDashStats(){
+  const players = getPlayers();
+  const resp    = getResponses();
+  const mResps  = resp.filter(r=>r.date===dashDate&&r.type==='morning');
+  const tResps  = resp.filter(r=>r.date===dashDate&&r.type==='training');
+  const days7   = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const dayN    = days7[new Date(dashDate+'T12:00:00').getDay()];
+  const withT   = players.filter(p=>p.trainingDays?.[dayN]?.active);
+  const avgRPE  = avg(tResps,'q_rpe');
+  const avgSleep= avg(mResps,'q_sleep');
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="stat-card"><div class="stat-value">${mResps.length}/${players.length}</div><div class="stat-label">🌅 Matins remplis</div></div>
+    <div class="stat-card"><div class="stat-value">${tResps.length}/${withT.length}</div><div class="stat-label">💪 Charges remplies</div></div>
+    <div class="stat-card"><div class="stat-value rpe-${Math.round(avgRPE)||0}">${avgRPE||'—'}</div><div class="stat-label">📊 RPE moyen</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--secondary)">${avgSleep||'—'}</div><div class="stat-label">😴 Sommeil moyen</div></div>`;
+}
+function renderMorningTable(){
+  const players = getPlayers();
+  const mResps  = getResponses().filter(r=>r.date===dashDate&&r.type==='morning');
+  const qcfg    = getQConfig().morning.filter(q=>q.active);
+  if(!mResps.length){
+    document.getElementById('morning-table-wrap').innerHTML='<p class="text-muted" style="font-size:.85rem">Aucune donnée pour cette date.</p>';return;
+  }
+  const headers = qcfg.map(q=>`<th title="${q.label}">${q.label.substring(0,12)}…</th>`).join('')+'<th>Commentaire</th>';
+  const rows = players.map(p=>{
+    const r = mResps.find(x=>x.playerId===p.id);
+    if(!r) return `<tr><td class="bold">${firstName(p.name)}</td><td colspan="${qcfg.length+1}"><span class="badge badge-red">Non rempli</span></td></tr>`;
+    const cells = qcfg.map(q=>{
+      const v = r.answers[q.id];
+      if(v===undefined) return '<td>—</td>';
+      if(typeof v==='boolean') return `<td>${v?'⚠️ Oui':'✅ Non'}</td>`;
+      return `<td><span class="rpe-${v}">${v}</span></td>`;
+    }).join('');
+    const cmt = r.comment?`<td style="font-size:.75rem;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.comment}">${r.comment}</td>`:'<td>—</td>';
+    return `<tr><td class="bold">${firstName(p.name)}</td>${cells}${cmt}</tr>`;
+  }).join('');
+  document.getElementById('morning-table-wrap').innerHTML=`
+    <table class="report-table">
+      <thead><tr><th>Joueuse</th>${headers}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+function renderTrainingTable(){
+  const players = getPlayers();
+  const tResps  = getResponses().filter(r=>r.date===dashDate&&r.type==='training');
+  const days7   = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const dayN    = days7[new Date(dashDate+'T12:00:00').getDay()];
+  const withT   = players.filter(p=>p.trainingDays?.[dayN]?.active);
+  const qcfg    = getQConfig().training.filter(q=>q.active);
+  if(!withT.length){
+    document.getElementById('training-table-wrap').innerHTML='<p class="text-muted" style="font-size:.85rem">Aucun entraînement prévu ce jour-là.</p>';return;
+  }
+  if(!tResps.length){
+    document.getElementById('training-table-wrap').innerHTML='<p class="text-muted" style="font-size:.85rem">Aucune charge enregistrée.</p>';return;
+  }
+  const headers = qcfg.map(q=>`<th title="${q.label}">${q.label.substring(0,10)}…</th>`).join('')+'<th>Commentaire</th>';
+  const rows = withT.map(p=>{
+    const r = tResps.find(x=>x.playerId===p.id);
+    const typeLabel = r?.sessionType==='physique'?'<span class="badge badge-blue">Physique</span>':'<span class="badge badge-green">Volley</span>';
+    if(!r) return `<tr><td class="bold">${firstName(p.name)}</td><td>${typeLabel}</td><td colspan="${qcfg.length+1}"><span class="badge badge-red">Non rempli</span></td></tr>`;
+    const cells = qcfg.map(q=>{
+      const v = r.answers[q.id];
+      if(v===undefined) return '<td>—</td>';
+      if(typeof v==='boolean') return `<td>${v?'⚠️':'✅'}</td>`;
+      return `<td><span class="rpe-${v}">${v}</span></td>`;
+    }).join('');
+    const cmt = r.comment?`<td style="font-size:.75rem;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.comment}">${r.comment}</td>`:'<td>—</td>';
+    return `<tr><td class="bold">${firstName(p.name)}</td><td>${typeLabel}</td>${cells}${cmt}</tr>`;
+  }).join('');
+  document.getElementById('training-table-wrap').innerHTML=`
+    <table class="report-table">
+      <thead><tr><th>Joueuse</th><th>Type</th>${headers}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+function renderAlerts(){
+  const resp  = getResponses().filter(r=>r.date===dashDate);
+  const alerts= [];
+  resp.forEach(r=>{
+    if(r.answers.q_pain===true)    alerts.push({name:r.playerName, msg:'🤕 Douleurs déclarées (matin)'});
+    if(r.answers.q_pain_after===true) alerts.push({name:r.playerName, msg:'⚠️ Douleurs post-séance'});
+    if(r.answers.q_fatigue<=3)     alerts.push({name:r.playerName, msg:`😴 Fatigue très élevée (${r.answers.q_fatigue}/10)`});
+    if(r.answers.q_rpe>=9)         alerts.push({name:r.playerName, msg:`🔥 RPE maximal (${r.answers.q_rpe}/10)`});
+    if(r.answers.q_period>=7)      alerts.push({name:r.playerName, msg:`🩸 Règles intenses (${r.answers.q_period}/10)`});
+  });
+  const w = document.getElementById('alerts-wrap');
+  if(!alerts.length){w.innerHTML='<p class="text-muted" style="font-size:.85rem">✅ Aucune alerte pour cette journée.</p>';return;}
+  w.innerHTML = alerts.map(a=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <div class="player-avatar" style="width:32px;height:32px;font-size:.85rem">${a.name.charAt(0)}</div>
+      <div><span class="bold" style="font-size:.85rem">${firstName(a.name)}</span> — ${a.msg}</div>
+    </div>`).join('');
+}
+
+/* ==========================================================
+   JOUEUSES TAB (individual reports)
+   ========================================================== */
+function renderJoueusesTab(){
+  const players  = getPlayers();
+  const responses= getResponses();
+  const c = document.getElementById('joueuses-list');
+  if(!players.length){c.innerHTML='<p class="text-muted">Aucune joueuse.</p>';return;}
+  c.innerHTML = players.map(p=>{
+    const pResps = responses.filter(r=>r.playerId===p.id);
+    const last   = pResps.sort((a,b)=>b.date.localeCompare(a.date))[0];
+    return `
+    <div class="player-item" onclick="showPlayerReport('${p.id}')">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="player-avatar">${p.name.charAt(0).toUpperCase()}</div>
+        <div>
+          <div class="bold">${p.name}</div>
+          <div class="text-muted" style="font-size:.75rem">${pResps.length} réponses · dernière : ${last?new Date(last.date+'T12:00:00').toLocaleDateString('fr-FR'):'—'}</div>
+        </div>
+      </div>
+      <span style="color:var(--muted);font-size:1.2rem">›</span>
+    </div>`;
+  }).join('');
+}
+function showPlayerReport(pid){
+  const player = getPlayers().find(p=>p.id===pid);
+  if(!player) return;
+  document.getElementById('pr-name').textContent = player.name;
+  const responses = getResponses().filter(r=>r.playerId===pid).sort((a,b)=>b.date.localeCompare(a.date));
+  const last7 = getLast7Days();
+  const mR7  = responses.filter(r=>r.type==='morning'&&last7.includes(r.date));
+  const tR7  = responses.filter(r=>r.type==='training'&&last7.includes(r.date));
+  const avgRPE7   = avg(tR7,'q_rpe');
+  const avgSleep7 = avg(mR7,'q_sleep');
+  const avgMotiv7 = avg(mR7,'q_motivation');
+  const avgScore7 = avg(tR7,'q_session_score');
+
+  // training days config summary
+  const dayL={lundi:'Lun',mardi:'Mar',mercredi:'Mer',jeudi:'Jeu',vendredi:'Ven',samedi:'Sam',dimanche:'Dim'};
+  const tDays = Object.entries(player.trainingDays||{}).filter(([,v])=>v.active)
+    .map(([d,cfg])=>`<span class="badge ${cfg.type==='physique'?'badge-blue':'badge-green'}">${dayL[d]} ${cfg.type==='physique'?'🏋️':'🏐'} ${cfg.endTime}</span>`)
+    .join(' ');
+
+  // recent history rows
+  const recentRows = responses.slice(0,20).map(r=>{
+    const typ = r.type==='morning'?'🌅 Matin':(r.sessionType==='physique'?'🏋️ Physique':'🏐 Volley');
+    const main = r.type==='morning'
+      ?`😴 ${r.answers.q_sleep||'—'} ⚡ ${r.answers.q_fatigue||'—'}`
+      :`RPE <span class="rpe-${r.answers.q_rpe}">${r.answers.q_rpe||'—'}</span> Note <span class="rpe-${r.answers.q_session_score}">${r.answers.q_session_score||'—'}</span>`;
+    const flags=[];
+    if(r.answers.q_pain===true)   flags.push('🤕');
+    if(r.answers.q_period>=7)     flags.push(`🩸${r.answers.q_period}`);
+    if(r.answers.q_fatigue<=3)    flags.push(`⚡${r.answers.q_fatigue}`);
+    if(r.answers.q_rpe>=9)        flags.push(`🔥${r.answers.q_rpe}`);
+    const cmt = r.comment?`<br><em style="font-size:.72rem;color:var(--muted)">"${r.comment}"</em>`:'';
+    return `<tr>
+      <td>${new Date(r.date+'T12:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</td>
+      <td>${typ}</td>
+      <td style="font-size:.8rem">${main}${cmt}</td>
+      <td>${flags.join(' ')||'✅'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('pr-content').innerHTML=`
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-value rpe-${Math.round(avgRPE7)||0}">${avgRPE7||'—'}</div><div class="stat-label">RPE moy. 7j</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--secondary)">${avgSleep7||'—'}</div><div class="stat-label">Sommeil moy. 7j</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--success)">${avgScore7||'—'}</div><div class="stat-label">Note séance 7j</div></div>
+      <div class="stat-card"><div class="stat-value">${responses.length}</div><div class="stat-label">Total réponses</div></div>
+    </div>
+    <div class="card">
+      <h3 class="mb-8">📅 Planning entraînement</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${tDays||'<span class="text-muted">Non configuré</span>'}</div>
+    </div>
+    <div class="card">
+      <h3 class="mb-8">📈 RPE — 7 derniers jours</h3>
+      ${renderMiniChart(tR7,last7,'q_rpe')}
+    </div>
+    <div class="card">
+      <h3 class="mb-8">📈 Sommeil — 7 derniers jours</h3>
+      ${renderMiniChart(mR7,last7,'q_sleep')}
+    </div>
+    <div class="card">
+      <h3 class="mb-12">📋 Historique récent</h3>
+      <div style="overflow-x:auto">
+        <table class="report-table">
+          <thead><tr><th>Date</th><th>Type</th><th>Données</th><th>Alertes</th></tr></thead>
+          <tbody>${recentRows||'<tr><td colspan="4" class="text-muted">Aucune donnée.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+  showScreen('player-report');
+}
+
+function renderMiniChart(resps, days7, field){
+  const dayLetters=['D','L','Ma','Me','J','V','S'];
+  const colors=['#94a3b8','#10b981','#10b981','#84cc16','#84cc16','#f59e0b','#f59e0b','#f97316','#f97316','#ef4444','#ef4444'];
+  if(!resps.length) return '<p class="text-muted" style="font-size:.82rem">Pas de donnée cette semaine.</p>';
+  const bars = days7.map(date=>{
+    const r = resps.find(x=>x.date===date);
+    const v = r?r.answers[field]:null;
+    const h = v!==null&&v!==undefined?(v/10*55)+5:0;
+    const col = v!==null?colors[v]:'#e2e8f0';
+    const dIdx = new Date(date+'T12:00:00').getDay();
+    return `<div class="mini-bar-col">
+      ${v!==null?`<span class="mini-val" style="color:${col}">${v}</span>`:'<span class="mini-val"> </span>'}
+      <div class="mini-bar" style="height:${h}px;background:${col}"></div>
+      <span class="mini-label">${dayLetters[dIdx]}</span>
+    </div>`;
+  }).join('');
+  return `<div class="mini-chart-wrap">${bars}</div>`;
+}
+
+/* ==========================================================
+   CONFIG TAB
+   ========================================================== */
+function renderConfigTab(){
+  renderQEditor('morning');
+  renderQEditor('training');
+  renderPlayersConfig();
+  // Day toggle listeners
+  document.querySelectorAll('#new-days .toggle-day').forEach(btn=>{
+    btn.onclick=function(){this.classList.toggle('active');renderDaysDetail();};
+  });
+}
+
+/* ---- Question Editor ---- */
+function renderQEditor(type){
+  const qcfg = getQConfig();
+  const qs   = qcfg[type];
+  const cid  = type+'-q-editor';
+  const typeLabels = {borg:'Borg 1-10',borg0:'Borg 0-10',yn:'Oui/Non',text:'Texte libre'};
+  const typeColors = {borg:'chip-borg',borg0:'chip-borg0',yn:'chip-yn',text:'chip-text'};
+  document.getElementById(cid).innerHTML = qs.map((q,i)=>`
+    <div class="q-editor-item">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <span class="bold" style="font-size:.9rem">${i+1}. ${q.label.substring(0,40)}${q.label.length>40?'…':''}</span>
+          <span class="q-type-chip ${typeColors[q.type]||'chip-borg'}">${typeLabels[q.type]||q.type}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.8rem">
+            <input type="checkbox" ${q.active?'checked':''} onchange="toggleQuestion('${type}',${i})"> Actif
+          </label>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:none;padding:6px 10px" onclick="deleteQuestion('${type}',${i})">✕</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="form-input" style="flex:2;min-width:140px;padding:7px 10px;font-size:.82rem" value="${escHtml(q.label)}" onchange="updateQuestion('${type}',${i},'label',this.value)" placeholder="Texte de la question">
+        <select class="form-select" style="flex:1;min-width:110px;padding:7px;font-size:.82rem" onchange="updateQuestion('${type}',${i},'type',this.value)">
+          <option value="borg"  ${q.type==='borg' ?'selected':''}>Borg 1-10</option>
+          <option value="borg0" ${q.type==='borg0'?'selected':''}>Borg 0-10</option>
+          <option value="yn"    ${q.type==='yn'   ?'selected':''}>Oui/Non</option>
+        </select>
+      </div>
+      <input class="form-input mt-8" style="padding:6px 10px;font-size:.78rem;color:var(--muted)" value="${escHtml(q.hint||'')}" onchange="updateQuestion('${type}',${i},'hint',this.value)" placeholder="Aide (optionnel)">
+    </div>`).join('') +
+    `<div class="q-editor-item" style="background:#f0fdf4;border-color:#a7f3d0">
+      <span class="bold" style="font-size:.9rem">💬 Commentaire libre</span>
+      <span class="q-type-chip chip-text">Texte</span>
+      <p class="text-muted mt-8" style="font-size:.78rem">Toujours présent en fin de questionnaire, non modifiable.</p>
+    </div>`;
+}
+function toggleQuestion(type,idx){
+  const cfg = getQConfig();
+  cfg[type][idx].active = !cfg[type][idx].active;
+  DB.set('qconfig',cfg);
+  renderQEditor(type);
+}
+function updateQuestion(type,idx,field,val){
+  const cfg = getQConfig();
+  cfg[type][idx][field] = val;
+  DB.set('qconfig',cfg);
+}
+function deleteQuestion(type,idx){
+  if(!confirm('Supprimer cette question ?')) return;
+  const cfg = getQConfig();
+  cfg[type].splice(idx,1);
+  DB.set('qconfig',cfg);
+  renderQEditor(type);
+}
+function addQuestion(type){
+  const cfg = getQConfig();
+  cfg[type].push({id:'q_custom_'+Date.now(),active:true,label:'Nouvelle question',type:'borg',hint:''});
+  DB.set('qconfig',cfg);
+  renderQEditor(type);
+}
+
+/* ---- Players Config ---- */
+function renderDaysDetail(){
+  const activeDays = Array.from(document.querySelectorAll('#new-days .toggle-day.active')).map(b=>b.dataset.day);
+  const labels={lundi:'Lundi',mardi:'Mardi',mercredi:'Mercredi',jeudi:'Jeudi',vendredi:'Vendredi',samedi:'Samedi',dimanche:'Dimanche'};
+  document.getElementById('days-detail').innerHTML = activeDays.map(day=>`
+    <div class="card" style="padding:12px;margin-top:8px">
+      <div class="bold" style="font-size:.85rem;margin-bottom:8px">${labels[day]}</div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1">
+          <label class="form-label">Type</label>
+          <select class="form-select" id="type-${day}" style="padding:8px;font-size:.85rem">
+            <option value="volley">🏐 Volley</option>
+            <option value="physique">🏋️ Physique</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label class="form-label">Fin de séance</label>
+          <input type="time" class="form-input" id="end-${day}" value="20:00" style="padding:8px;font-size:.85rem">
+        </div>
+      </div>
+    </div>`).join('');
+}
+function addPlayer(){
+  const name = document.getElementById('new-name').value.trim();
+  if(!name){alert('Entrez un nom.');return;}
+  const morningTime = document.getElementById('new-morning').value||'08:00';
+  const activeDays  = Array.from(document.querySelectorAll('#new-days .toggle-day.active')).map(b=>b.dataset.day);
+  const allDays     = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
+  const trainingDays= {};
+  allDays.forEach(d=>{
+    const active = activeDays.includes(d);
+    trainingDays[d]={active,type:active?(document.getElementById('type-'+d)?.value||'volley'):'volley',endTime:active?(document.getElementById('end-'+d)?.value||'20:00'):'20:00'};
+  });
+  const p = {id:Date.now().toString(),name,morningTime,trainingDays};
+  const players=[...getPlayers(),p];
+  DB.set('players',players);
+  document.getElementById('new-name').value='';
+  document.querySelectorAll('#new-days .toggle-day').forEach(b=>b.classList.remove('active'));
+  document.getElementById('days-detail').innerHTML='';
+  renderPlayersConfig();
+  alert(`✅ ${name} ajoutée !`);
+}
+function renderPlayersConfig(){
+  const players = getPlayers();
+  const dayL={lundi:'L',mardi:'Ma',mercredi:'Me',jeudi:'J',vendredi:'V',samedi:'S',dimanche:'D'};
+  const c = document.getElementById('players-list-config');
+  if(!players.length){c.innerHTML='<p class="text-muted" style="font-size:.85rem">Aucune joueuse.</p>';return;}
+  c.innerHTML = players.map(p=>{
+    const chips = Object.entries(p.trainingDays||{}).filter(([,v])=>v.active)
+      .map(([d,cfg])=>`<span class="badge ${cfg.type==='physique'?'badge-blue':'badge-green'}">${dayL[d]}</span>`).join(' ');
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div class="bold" style="font-size:.9rem">${p.name}</div>
+        <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">${chips||'<span class="text-muted" style="font-size:.75rem">Pas d\'entraînement configuré</span>'}</div>
+      </div>
+      <button onclick="deletePlayer('${p.id}')" style="background:#fee2e2;color:#991b1b;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem">🗑️</button>
+    </div>`;
+  }).join('');
+}
+function deletePlayer(pid){
+  if(!confirm('Supprimer cette joueuse ? Ses données seront conservées.')) return;
+  DB.set('players',getPlayers().filter(p=>p.id!==pid));
+  renderPlayersConfig();
+}
+function changePin(){
+  const v=document.getElementById('new-pin').value;
+  if(!/^\d{4}$/.test(v)){alert('Le PIN doit comporter 4 chiffres.');return;}
+  const s=getSettings();s.pin=v;DB.set('settings',s);
+  document.getElementById('new-pin').value='';
+  alert('✅ PIN modifié !');
+}
+
+/* ==========================================================
+   EXPORT CSV
+   ========================================================== */
+function exportCSV(){
+  const resp = getResponses();
+  if(!resp.length){alert('Aucune donnée à exporter.');return;}
+  const qcfg = getQConfig();
+  const allIds = [...new Set([...qcfg.morning,...qcfg.training].map(q=>q.id))];
+  const headers = ['Date','Joueuse','Type','TypeSéance',...allIds,'Commentaire'];
+  const rows = resp.map(r=>[r.date,r.playerName,r.type,r.sessionType||'',...allIds.map(id=>{
+    const v=r.answers[id];
+    if(v===undefined) return '';
+    if(typeof v==='boolean') return v?'Oui':'Non';
+    return v;
+  }),r.comment||'']);
+  const csv=[headers,...rows].map(row=>row.join(';')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`rpe-suivi-${todayKey()}.csv`;a.click();
+}
+
+/* ==========================================================
+   NOTIFICATIONS
+   ========================================================== */
+async function requestNotifPermission(){
+  if(!('Notification' in window)) return false;
+  if(Notification.permission==='granted') return true;
+  if(Notification.permission!=='denied'){
+    const p=await Notification.requestPermission();
+    return p==='granted';
+  }
+  return false;
+}
+function scheduleNotifications(){
+  const players=getPlayers();
+  const today=todayKey();
+  const resp=getResponses();
+  const days7=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const todayN=days7[new Date().getDay()];
+  players.forEach(p=>{
+    if(!resp.some(r=>r.playerId===p.id&&r.date===today&&r.type==='morning')){
+      const [h,m]=(p.morningTime||'08:00').split(':').map(Number);
+      scheduleReminder(p,'morning',h,m);
+    }
+    if(p.trainingDays?.[todayN]?.active&&!resp.some(r=>r.playerId===p.id&&r.date===today&&r.type==='training')){
+      const [h,m]=(p.trainingDays[todayN].endTime||'20:00').split(':').map(Number);
+      scheduleReminder(p,'training',h,m);
+    }
+  });
+}
+function scheduleReminder(player,type,hour,minute){
+  const now=new Date(),target=new Date();
+  target.setHours(hour,minute,0,0);
+  let delay=target-now;
+  const key=`${player.id}-${type}`;
+  if(reminderTimers[key]) clearTimeout(reminderTimers[key]);
+  if(delay<=0){
+    if(delay>-2*3600000) startReminderLoop(player,type);
+    return;
+  }
+  reminderTimers[key]=setTimeout(()=>{sendNotif(player,type);startReminderLoop(player,type);},delay);
+}
+function startReminderLoop(player,type){
+  const lkey=`${player.id}-${type}-loop`;
+  if(reminderTimers[lkey]) return;
+  reminderTimers[lkey]=setInterval(()=>{
+    const done=getResponses().some(r=>r.playerId===player.id&&r.date===todayKey()&&r.type===type);
+    if(done){clearInterval(reminderTimers[lkey]);delete reminderTimers[lkey];return;}
+    sendNotif(player,type);
+  },10*60*1000);
+}
+function cancelReminder(pid,type){
+  const lkey=`${pid}-${type}-loop`;
+  if(reminderTimers[lkey]){clearInterval(reminderTimers[lkey]);delete reminderTimers[lkey];}
+}
+function sendNotif(player,type){
+  if(Notification.permission!=='granted') return;
+  const title=type==='morning'?`🌅 Bien-être – ${firstName(player.name)}`:`💪 Charge séance – ${firstName(player.name)}`;
+  const body =type==='morning'?'N\'oubliez pas votre questionnaire matinal !':'Évaluez votre séance d\'entraînement !';
+  new Notification(title,{body,tag:`${player.id}-${type}`});
+}
+function updateNotifStatus(){
+  const el=document.getElementById('notif-status-home');
+  if(!el) return;
+  if(!('Notification' in window)){el.textContent='⚠️ Notifications non supportées';return;}
+  el.textContent=Notification.permission==='granted'?'🔔 Notifications activées':'🔕 Notifications désactivées — cliquez pour activer';
+  el.style.cursor=Notification.permission!=='granted'?'pointer':'default';
+  el.onclick=Notification.permission!=='granted'?async()=>{await requestNotifPermission();updateNotifStatus();}:null;
+}
+
+/* ==========================================================
+   HELPERS
+   ========================================================== */
+function todayKey(){ return new Date().toISOString().split('T')[0]; }
+function firstName(name){ return (name||'').split(' ')[0]; }
+function getLast7Days(){
+  return Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);return d.toISOString().split('T')[0];});
+}
+function avg(arr,field){
+  const vals=arr.map(r=>r.answers[field]).filter(v=>typeof v==='number');
+  if(!vals.length) return null;
+  return (vals.reduce((s,v)=>s+v,0)/vals.length).toFixed(1);
+}
+function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+/* ==========================================================
+   SERVICE WORKER
+   ========================================================== */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+/* ==========================================================
+   INIT
+   ========================================================== */
+document.addEventListener('DOMContentLoaded',async()=>{
+  await requestNotifPermission();
+  scheduleNotifications();
+  updateNotifStatus();
+  // init qconfig if not set
+  if(!localStorage.getItem('qconfig')) DB.set('qconfig',DEFAULT_QCONFIG());
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden) scheduleNotifications();});
+});
+</script>
+</body>
+</html>
