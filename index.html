@@ -1,0 +1,2581 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="RPE Suivi">
+<meta name="theme-color" content="#1a56db">
+<link rel="manifest" href="manifest.json">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<title>RPE & Suivi de Charge</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#1a56db;--primary-dark:#1340b0;--secondary:#f59e0b;
+  --success:#10b981;--danger:#ef4444;--warning:#f97316;
+  --bg:#f0f4ff;--card:#fff;--text:#1e293b;--muted:#64748b;--border:#e2e8f0;
+  --radius:14px;--shadow:0 2px 12px rgba(0,0,0,0.07);
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overscroll-behavior:none}
+.screen{display:none;min-height:100vh;padding:20px 16px 90px;max-width:520px;margin:0 auto}
+.screen.active{display:flex;flex-direction:column}
+.header{display:flex;align-items:center;gap:12px;margin-bottom:22px;padding-bottom:14px;border-bottom:2px solid var(--primary)}
+.header h1{font-size:1.3rem;font-weight:800;color:var(--primary)}
+.back-btn{background:none;border:none;font-size:1.6rem;cursor:pointer;color:var(--primary);padding:4px;line-height:1;flex-shrink:0}
+.card{background:var(--card);border-radius:var(--radius);padding:18px;margin-bottom:14px;box-shadow:var(--shadow);border:1px solid var(--border)}
+.card h3{font-size:1rem;font-weight:700;margin-bottom:12px}
+.btn{display:block;width:100%;padding:15px;border-radius:12px;border:none;font-size:1rem;font-weight:700;cursor:pointer;transition:.2s;text-align:center}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:active{background:var(--primary-dark)}
+.btn-secondary{background:var(--secondary);color:#fff}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-outline{background:transparent;border:2px solid var(--primary);color:var(--primary)}
+.btn-sm{padding:9px 14px;width:auto;font-size:.85rem;border-radius:10px}
+.btn-ghost{background:var(--bg);border:1px solid var(--border);color:var(--text)}
+.mb-8{margin-bottom:8px}.mb-12{margin-bottom:12px}.mb-16{margin-bottom:16px}.mt-8{margin-top:8px}.mt-12{margin-top:12px}.mt-16{margin-top:16px}
+.flex{display:flex}.flex-between{display:flex;justify-content:space-between;align-items:center}.gap-8{gap:8px}.gap-12{gap:12px}
+.text-muted{color:var(--muted);font-size:.85rem}.text-center{text-align:center}.bold{font-weight:700}
+.hidden{display:none!important}
+
+/* HERO */
+.hero{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:88vh;text-align:center;gap:18px}
+.hero-logo{font-size:4.5rem;filter:drop-shadow(0 4px 8px rgba(26,86,219,.2))}
+.hero h1{font-size:2rem;font-weight:900;color:var(--primary);line-height:1.1}
+.hero p{color:var(--muted);font-size:.95rem}
+.hero-buttons{display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px}
+
+/* PLAYER LIST */
+.player-item{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--card);border-radius:12px;margin-bottom:10px;border:1.5px solid var(--border);cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.player-item:active{border-color:var(--primary);background:#eff6ff;transform:scale(.99)}
+.player-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#5b21b6);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;flex-shrink:0}
+
+/* STATUS DOTS */
+.status-row{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
+.status-pill{padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:600}
+.pill-done{background:#d1fae5;color:#065f46}
+.pill-pending{background:#fef3c7;color:#92400e}
+.pill-na{background:#f1f5f9;color:#64748b}
+
+/* PROGRESS */
+.progress-wrap{margin-bottom:20px}
+.progress-meta{display:flex;justify-content:space-between;font-size:.8rem;color:var(--muted);margin-bottom:6px}
+.progress-bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),#7c3aed);border-radius:4px;transition:width .35s cubic-bezier(.4,0,.2,1)}
+
+/* QUESTIONS */
+.question{margin-bottom:20px;padding:16px;background:var(--card);border-radius:var(--radius);border:1.5px solid var(--border);box-shadow:var(--shadow);transition:.2s}
+.question.answered{border-color:var(--success)}
+.question-label{font-size:1rem;font-weight:700;margin-bottom:10px;line-height:1.35}
+.question-hint{font-size:.75rem;color:var(--muted);margin-bottom:10px;font-style:italic}
+
+/* BORG */
+.borg-scale{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-top:2px}
+.borg-btn{padding:11px 4px;border-radius:10px;border:2px solid var(--border);background:#fafafa;font-size:1rem;font-weight:800;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.borg-btn:active{transform:scale(.93)}
+.borg-btn.selected{color:#fff;border-color:transparent;transform:scale(1.04)}
+.borg-btn[data-val="0"].selected{background:#94a3b8}
+.borg-btn[data-val="1"].selected,.borg-btn[data-val="2"].selected{background:#ef4444}
+.borg-btn[data-val="3"].selected,.borg-btn[data-val="4"].selected{background:#f97316}
+.borg-btn[data-val="5"].selected,.borg-btn[data-val="6"].selected{background:#f59e0b}
+.borg-btn[data-val="7"].selected,.borg-btn[data-val="8"].selected{background:#84cc16}
+.borg-btn[data-val="9"].selected,.borg-btn[data-val="10"].selected{background:#10b981}
+
+/* YES/NO */
+.yn-group{display:flex;gap:10px;margin-top:2px}
+.yn-btn{flex:1;padding:13px;border-radius:10px;border:2px solid var(--border);background:#fafafa;font-size:.95rem;font-weight:700;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.yn-btn:active{transform:scale(.96)}
+.yn-btn.yes.selected{background:var(--success);color:#fff;border-color:var(--success)}
+.yn-btn.no.selected{background:var(--danger);color:#fff;border-color:var(--danger)}
+
+/* TEXTAREA */
+.comment-area{width:100%;padding:12px;border-radius:10px;border:2px solid var(--border);font-size:.9rem;font-family:inherit;resize:vertical;min-height:70px;transition:.2s;outline:none}
+.comment-area:focus{border-color:var(--primary)}
+
+/* PIN */
+.pin-input{display:flex;gap:14px;justify-content:center;margin:24px 0}
+.pin-digit{width:58px;height:68px;border:2.5px solid var(--border);border-radius:12px;font-size:1.6rem;text-align:center;font-weight:800;outline:none;transition:.2s}
+.pin-digit:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,86,219,.15)}
+
+/* TABS */
+.tabs{display:flex;gap:4px;background:var(--border);border-radius:12px;padding:4px;margin-bottom:18px}
+.tab{flex:1;padding:11px 6px;border-radius:9px;border:none;background:transparent;font-size:.8rem;font-weight:700;cursor:pointer;color:var(--muted);transition:.2s}
+.tab.active{background:#fff;color:var(--primary);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+
+/* BADGES */
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:.72rem;font-weight:700}
+.badge-green{background:#d1fae5;color:#065f46}
+.badge-red{background:#fee2e2;color:#991b1b}
+.badge-yellow{background:#fef3c7;color:#92400e}
+.badge-blue{background:#dbeafe;color:#1e40af}
+.badge-purple{background:#ede9fe;color:#5b21b6}
+
+/* STAT GRID */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px}
+.stat-card{background:var(--card);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--border);box-shadow:var(--shadow)}
+.stat-value{font-size:2rem;font-weight:900;color:var(--primary)}
+.stat-label{font-size:.72rem;color:var(--muted);margin-top:4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+
+/* TABLE */
+.report-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.report-table th{text-align:left;padding:7px 9px;background:var(--bg);color:var(--muted);font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.report-table td{padding:10px 9px;border-bottom:1px solid var(--border);vertical-align:middle}
+.report-table tbody tr:last-child td{border-bottom:none}
+.report-table tbody tr:hover td{background:#f8fafc}
+
+/* RPE COLORS */
+.rpe-0{color:#94a3b8;font-weight:700}
+.rpe-1,.rpe-2{color:#ef4444;font-weight:700}
+.rpe-3,.rpe-4{color:#f97316;font-weight:700}
+.rpe-5,.rpe-6{color:#f59e0b;font-weight:700}
+.rpe-7,.rpe-8{color:#84cc16;font-weight:700}
+.rpe-9,.rpe-10{color:#10b981;font-weight:700}
+
+/* FORM */
+.form-group{margin-bottom:14px}
+.form-label{font-size:.85rem;font-weight:700;margin-bottom:6px;display:block;color:var(--muted)}
+.form-input{width:100%;padding:11px 13px;border-radius:10px;border:2px solid var(--border);font-size:.95rem;outline:none;transition:.2s;font-family:inherit}
+.form-input:focus{border-color:var(--primary)}
+.form-select{width:100%;padding:11px 13px;border-radius:10px;border:2px solid var(--border);font-size:.95rem;background:#fff;font-family:inherit}
+
+/* TOGGLE DAYS */
+.toggle-group{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}
+.toggle-day{padding:8px 11px;border-radius:8px;border:2px solid var(--border);background:#fff;font-size:.82rem;font-weight:700;cursor:pointer;transition:.15s}
+.toggle-day.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* ALERT */
+.alert{padding:12px 14px;border-radius:10px;margin-bottom:14px;font-size:.88rem}
+.alert-info{background:#dbeafe;color:#1e40af;border:1px solid #bfdbfe}
+.alert-success{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0}
+.alert-warning{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+
+/* SUCCESS */
+.success-anim{text-align:center;padding:40px 20px}
+.success-anim .check{font-size:5rem;animation:bounceIn .5s ease}
+@keyframes bounceIn{0%{transform:scale(0)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+
+/* MINI CHART */
+.mini-chart-wrap{display:flex;gap:5px;align-items:flex-end;height:70px;padding:4px 0}
+.mini-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.mini-bar{width:100%;border-radius:4px 4px 0 0;min-height:3px;transition:.3s}
+.mini-label{font-size:.6rem;color:var(--muted)}
+.mini-val{font-size:.65rem;font-weight:800}
+
+/* DASHBOARD CHARTS */
+.chart-container{position:relative;width:100%;overflow-x:auto}
+.bar-chart{display:flex;align-items:flex-end;gap:3px;height:140px;padding:4px 0}
+.bar-group{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:32px}
+.bar-stack{display:flex;gap:2px;align-items:flex-end;width:100%;justify-content:center;height:110px}
+.bar{width:14px;border-radius:4px 4px 0 0;min-height:2px;transition:.4s;cursor:pointer;position:relative}
+.bar:hover{opacity:.8}
+.bar-name{font-size:.6rem;color:var(--muted);text-align:center;margin-top:3px;line-height:1.1;max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-val{font-size:.58rem;font-weight:800;text-align:center}
+.chart-legend{display:flex;gap:14px;justify-content:center;margin-top:10px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:.72rem;color:var(--muted)}
+.legend-dot{width:10px;height:10px;border-radius:3px}
+.chart-axis-label{font-size:.65rem;color:var(--muted);text-align:center;margin-top:6px}
+.trend-line-chart{position:relative;height:160px;width:100%;margin-top:8px}
+.trend-svg{width:100%;height:100%}
+
+/* QUESTION EDITOR */
+.q-editor-item{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px}
+.q-editor-handle{cursor:grab;color:var(--muted);margin-right:8px}
+.q-type-chip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.72rem;font-weight:700;margin-left:8px}
+.chip-borg{background:#dbeafe;color:#1e40af}
+.chip-yn{background:#d1fae5;color:#065f46}
+.chip-text{background:#ede9fe;color:#5b21b6}
+.chip-borg0{background:#f1f5f9;color:#475569}
+
+/* NOTIF BADGE */
+.notif-badge{position:absolute;top:-4px;right:-4px;background:var(--danger);color:#fff;border-radius:50%;width:18px;height:18px;font-size:.65rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+
+/* SEPARATOR */
+.separator{height:1px;background:var(--border);margin:12px 0}
+
+@media(prefers-color-scheme:dark){
+  :root{--bg:#0f172a;--card:#1e293b;--text:#f1f5f9;--muted:#94a3b8;--border:#334155}
+  .borg-btn{background:#1e293b}.yn-btn{background:#1e293b}
+  .form-input,.form-select{background:#1e293b;color:#f1f5f9}
+  .comment-area{background:#1e293b;color:#f1f5f9}
+}
+
+/* Print / PDF export */
+@media print{
+  body{background:#fff!important;color:#1e293b!important;font-size:11pt}
+  .screen{display:none!important;padding:0!important;max-width:100%!important}
+  #screen-player-report{display:flex!important;min-height:auto!important;padding:10px!important}
+  #screen-player-report .header{border-bottom:2px solid #1a56db;margin-bottom:12px;padding-bottom:8px}
+  #screen-player-report .header .back-btn,
+  #screen-player-report .header button[onclick*="exportPlayerPDF"]{display:none!important}
+  .card{box-shadow:none!important;border:1px solid #e2e8f0;page-break-inside:avoid;margin-bottom:10px;padding:12px}
+  .stat-grid{grid-template-columns:repeat(4,1fr)!important}
+  .mini-chart-wrap{height:50px}
+  .report-table{font-size:9pt}
+  :root{--bg:#fff;--card:#fff;--text:#1e293b;--muted:#64748b;--border:#e2e8f0}
+}
+</style>
+</head>
+<body>
+
+<!-- ======== HOME ======== -->
+<div id="screen-home" class="screen active">
+  <div class="hero">
+    <div class="hero-logo">🏐</div>
+    <h1>RPE &amp; Suivi<br>de Charge</h1>
+    <p>Monitoring de la charge d'entraînement</p>
+    <div class="hero-buttons">
+      <button class="btn btn-primary" onclick="goToPlayerSelect()">Je suis une joueuse</button>
+      <button class="btn btn-outline" onclick="goToStaffLogin()">Accès Staff</button>
+    </div>
+    <p class="text-muted" style="font-size:.72rem;margin-top:8px" id="notif-status-home"></p>
+  </div>
+</div>
+
+<!-- ======== PLAYER SELECT ======== -->
+<div id="screen-player-select" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <h1>Qui êtes-vous ?</h1>
+  </div>
+  <div class="card" style="padding:12px;margin-bottom:12px;">
+    <label class="form-label">Mon équipe</label>
+    <div style="display:flex;gap:10px;">
+      <button id="btn-equipe-A" class="btn btn-primary btn-sm" onclick="selectEquipe('A')">Équipe A</button>
+      <button id="btn-equipe-B" class="btn btn-outline btn-sm" onclick="selectEquipe('B')">Équipe B</button>
+    </div>
+  </div>
+  <div id="player-list-container"></div>
+  <p class="text-muted text-center mt-16">Sélectionnez votre nom pour remplir votre questionnaire</p>
+</div>
+
+<!-- ======== QUEST CHOICE ======== -->
+<div id="screen-quest-choice" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('player-select')">←</button>
+    <h1 id="choice-player-name">Bonjour</h1>
+  </div>
+  <div id="quest-choice-content"></div>
+</div>
+
+<!-- ======== QUESTIONNAIRE ======== -->
+<div id="screen-questionnaire" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('quest-choice')">←</button>
+    <div>
+      <h1 id="quest-title">Questionnaire</h1>
+      <p class="text-muted" id="quest-subtitle"></p>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-meta">
+      <span id="quest-progress-label">Question 0/0</span>
+      <span id="quest-progress-pct">0%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="quest-progress" style="width:0%"></div></div>
+  </div>
+  <div id="quest-questions-container"></div>
+  <button class="btn btn-success mt-16 hidden" id="btn-submit" onclick="submitQuestionnaire()">✓ Envoyer mes réponses</button>
+</div>
+
+<!-- ======== SUCCESS ======== -->
+<div id="screen-success" class="screen">
+  <div class="success-anim">
+    <div class="check">✅</div>
+    <h2 style="margin-top:16px;color:var(--success);font-size:1.5rem">Merci !</h2>
+    <p class="text-muted mt-8" id="success-message">Réponses enregistrées.</p>
+    <button class="btn btn-primary mt-16" style="max-width:260px;margin:24px auto 0" onclick="showScreen('home')">Retour à l'accueil</button>
+  </div>
+</div>
+
+<!-- ======== STAFF LOGIN ======== -->
+<div id="screen-staff-login" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('home')">←</button>
+    <h1>Accès Staff</h1>
+  </div>
+  <div class="card">
+    <p class="text-muted mb-12">Entrez votre code PIN (4 chiffres)</p>
+    <div class="pin-input">
+      <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p1" oninput="pinMove(this,'p2')" onkeydown="pinDel(event,this,null)">
+      <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p2" oninput="pinMove(this,'p3')" onkeydown="pinDel(event,this,'p1')">
+      <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p3" oninput="pinMove(this,'p4')" onkeydown="pinDel(event,this,'p2')">
+      <input class="pin-digit" type="password" maxlength="1" inputmode="numeric" id="p4" oninput="pinMove(this,null)" onkeydown="pinDel(event,this,'p3')">
+    </div>
+    <div id="pin-error" class="alert alert-warning hidden">Code incorrect. Réessayez.</div>
+    <button class="btn btn-primary" onclick="checkPin()">Se connecter</button>
+  </div>
+  <p class="text-muted text-center mt-16" style="font-size:.75rem" id="pin-default-hint"></p>
+</div>
+
+<!-- ======== DASHBOARD ======== -->
+<div id="screen-dashboard" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="logoutStaff()">←</button>
+    <div>
+      <h1>Tableau de Bord</h1>
+      <p class="text-muted" id="dash-date-label"></p>
+    </div>
+    <button onclick="logoutStaff()" style="margin-left:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:.8rem;cursor:pointer;color:var(--muted)">🚪 Déco</button>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('rapport')">📊 Rapport</button>
+    <button class="tab" onclick="switchTab('joueuses')">👥 Joueuses</button>
+    <button class="tab" onclick="switchTab('config')">⚙️ Config</button>
+  </div>
+
+  <!-- TAB RAPPORT -->
+  <div id="tab-rapport">
+
+    <!-- === AJOUT BILAN CHARGE === Sous-onglets Bien-être / Charge -->
+    <div style="display:flex;gap:6px;margin-bottom:14px" id="rapport-subtabs">
+      <button class="btn btn-sm btn-primary" id="subtab-bienetre" onclick="switchRapportSubtab('bienetre')">🌅 Bilan Bien-être</button>
+      <button class="btn btn-sm btn-ghost" id="subtab-charge" onclick="switchRapportSubtab('charge')">💪 Bilan Charge</button>
+    </div>
+
+    <!-- === SOUS-ONGLET BIEN-ÊTRE (existant, inchangé) === -->
+    <div id="rapport-bienetre">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
+        <input type="date" id="dash-date-input" class="form-input" style="flex:1;padding:8px 10px;font-size:.85rem" onchange="loadDashboard()">
+        <button class="btn btn-sm btn-ghost" onclick="setDashboardDate(0)">Aujourd'hui</button>
+      </div>
+      <div class="stat-grid" id="dash-stats"></div>
+      <div class="card">
+        <h3>🌅 Bien-être Matinal</h3>
+        <div id="morning-table-wrap" style="overflow-x:auto"></div>
+      </div>
+      <div class="card">
+        <h3>💪 Charge des Séances</h3>
+        <div id="training-table-wrap" style="overflow-x:auto"></div>
+      </div>
+      <div class="card">
+        <h3 class="mb-8">⚠️ Alertes du jour</h3>
+        <div id="alerts-wrap"></div>
+      </div>
+      <div class="card">
+        <h3 class="mb-8">📊 RPE par joueuse — 7 derniers jours</h3>
+        <div id="chart-rpe-bars" class="chart-container"></div>
+      </div>
+      <div class="card">
+        <h3 class="mb-8">😴 Tendance Sommeil — 7 derniers jours</h3>
+        <div id="chart-sleep-trend" class="chart-container"></div>
+      </div>
+      <div class="card">
+        <h3 class="mb-8">👥 Vue d'ensemble Équipe — Aujourd'hui</h3>
+        <div id="chart-team-overview" class="chart-container"></div>
+      </div>
+    </div>
+
+    <!-- === AJOUT BILAN CHARGE === Sous-onglet Charge de Séance -->
+    <div id="rapport-charge" class="hidden">
+      <div class="card">
+        <h3 class="mb-8">👤 Sélection de la joueuse</h3>
+        <select id="charge-player-select" class="form-select" style="padding:10px 12px;font-size:.9rem" onchange="renderBilanCharge()">
+          <option value="">— Choisir une joueuse —</option>
+        </select>
+      </div>
+      <div id="bilan-charge-content" class="hidden">
+        <div class="card">
+          <h3 class="mb-8">📊 Charge individuelle — 14 derniers jours</h3>
+          <p class="text-muted" style="font-size:.75rem;margin-bottom:8px">Charge = RPE × durée (min). Barres empilées par créneau.</p>
+          <div class="chart-container"><canvas id="chart-charge-14j"></canvas></div>
+        </div>
+        <div class="card">
+          <h3 class="mb-8">⚖️ Comparaison Semaine actuelle vs Précédente</h3>
+          <p class="text-muted" style="font-size:.75rem;margin-bottom:8px">Charge totale, RPE moyen et nombre de séances — détection des pics.</p>
+          <div id="week-comparison-wrap"></div>
+        </div>
+        <div class="card">
+          <h3 class="mb-8">👥 RPE moyen du groupe — 10 dernières séances Volley</h3>
+          <p class="text-muted" style="font-size:.75rem;margin-bottom:8px">Moyenne RPE de toutes les joueuses par séance.</p>
+          <div class="chart-container"><canvas id="chart-groupe-volley"></canvas></div>
+        </div>
+        <div class="card">
+          <h3 class="mb-8">👤 RPE individuel — 10 dernières séances Volley</h3>
+          <p class="text-muted" style="font-size:.75rem;margin-bottom:8px">RPE de la joueuse sélectionnée vs moyenne du groupe.</p>
+          <div class="chart-container"><canvas id="chart-indiv-volley"></canvas></div>
+        </div>
+      </div>
+      <div id="bilan-charge-empty">
+        <p class="text-muted text-center" style="padding:30px 0">Sélectionnez une joueuse pour afficher les graphiques.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TAB JOUEUSES -->
+  <div id="tab-joueuses" class="hidden">
+    <div id="joueuses-list"></div>
+  </div>
+
+  <!-- TAB CONFIG -->
+  <div id="tab-config" class="hidden">
+
+    <!-- Ajouter joueuse -->
+    <div class="card">
+      <h3 class="mb-12">➕ Ajouter une joueuse</h3>
+      <div class="form-group">
+        <label class="form-label">Nom complet</label>
+        <input type="text" id="new-name" class="form-input" placeholder="Marie Dupont">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Équipe</label>
+        <select id="new-equipe" class="form-select">
+          <option value="A">Équipe A</option>
+          <option value="B">Équipe B</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Heure questionnaire matin (par défaut 08:00)</label>
+        <input type="time" id="new-morning" class="form-input" value="08:00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Jours d'entraînement</label>
+        <div class="toggle-group" id="new-days">
+          <button class="toggle-day" data-day="lundi">Lun</button>
+          <button class="toggle-day" data-day="mardi">Mar</button>
+          <button class="toggle-day" data-day="mercredi">Mer</button>
+          <button class="toggle-day" data-day="jeudi">Jeu</button>
+          <button class="toggle-day" data-day="vendredi">Ven</button>
+          <button class="toggle-day" data-day="samedi">Sam</button>
+          <button class="toggle-day" data-day="dimanche">Dim</button>
+        </div>
+      </div>
+      <div id="days-detail"></div>
+      <button class="btn btn-primary mt-8" onclick="addPlayer()">Ajouter</button>
+    </div>
+
+    <!-- Liste joueuses -->
+    <div class="card">
+      <h3 class="mb-12">👥 Joueuses enregistrées</h3>
+      <div id="players-list-config"></div>
+    </div>
+
+    <!-- Éditeur de questions -->
+    <div class="card">
+      <h3 class="mb-8">📝 Questions — Bien-être Matinal</h3>
+      <p class="text-muted mb-12" style="font-size:.8rem">Modifiez, activez/désactivez ou ajoutez des questions. Le commentaire final est toujours présent.</p>
+      <div id="morning-q-editor"></div>
+      <button class="btn btn-ghost btn-sm mt-8" onclick="addQuestion('morning')">+ Ajouter une question</button>
+    </div>
+
+    <div class="card">
+      <h3 class="mb-8">📝 Questions — Charge de Séance</h3>
+      <p class="text-muted mb-12" style="font-size:.8rem">Le commentaire final est toujours présent.</p>
+      <div id="training-q-editor"></div>
+      <button class="btn btn-ghost btn-sm mt-8" onclick="addQuestion('training')">+ Ajouter une question</button>
+    </div>
+
+    <!-- Réglages Notifications -->
+    <div class="card">
+      <h3 class="mb-12">🔔 Réglages Notifications</h3>
+      <p class="text-muted mb-12" style="font-size:.8rem">Ces réglages s'appliquent à toutes les joueuses (sauf celles dont les notifs sont désactivées individuellement).</p>
+      <div class="form-group">
+        <label class="form-label">⏰ Rappel matin</label>
+        <p class="text-muted" style="font-size:.75rem;margin-bottom:6px">Utilise l'heure configurée dans le profil de chaque joueuse (champ "Heure questionnaire matin").</p>
+        <div style="background:var(--bg);padding:10px 14px;border-radius:10px;font-size:.85rem;color:var(--muted)">
+          ✓ Individuel par joueuse — modifiable via ✏️ dans la liste ci-dessus
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">⏱️ Rappel post-séance</label>
+        <p class="text-muted" style="font-size:.75rem;margin-bottom:6px">Délai après la fin de séance (endTime) avant d'envoyer le rappel de charge.</p>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" id="notif-post-delay" class="form-input" style="width:80px;padding:8px 10px;font-size:.9rem" min="0" max="120" value="15">
+          <span class="text-muted" style="font-size:.85rem">minutes après la fin de séance</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">🔁 Fréquence de rappel</label>
+        <p class="text-muted" style="font-size:.75rem;margin-bottom:6px">Si la joueuse n'a pas rempli, renvoyer un rappel toutes les :</p>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" id="notif-repeat-interval" class="form-input" style="width:80px;padding:8px 10px;font-size:.9rem" min="5" max="120" value="10">
+          <span class="text-muted" style="font-size:.85rem">minutes</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">🛑 Arrêt automatique</label>
+        <p class="text-muted" style="font-size:.75rem;margin-bottom:6px">Arrêter les rappels après :</p>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" id="notif-stop-after" class="form-input" style="width:80px;padding:8px 10px;font-size:.9rem" min="1" max="12" value="2">
+          <span class="text-muted" style="font-size:.85rem">heures sans réponse</span>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm mt-8" onclick="saveNotifSettings()">💾 Enregistrer les réglages</button>
+    </div>
+
+    <!-- Seuils d'alerte -->
+    <div class="card">
+      <h3 class="mb-12">⚠️ Seuils d'alerte</h3>
+      <p class="text-muted mb-12" style="font-size:.8rem">Configurez à partir de quelles valeurs une alerte apparaît dans le rapport.</p>
+      <div class="form-group">
+        <label class="form-label" style="font-size:.82rem">😴 Fatigue ≤ (alerte si en dessous)</label>
+        <input type="number" id="alert-fatigue" class="form-input" style="width:80px;padding:8px 10px;font-size:.9rem" min="1" max="10" value="3">
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-size:.82rem">🔥 RPE ≥ (alerte si au-dessus)</label>
+        <input type="number" id="alert-rpe" class="form-input" style="width:80px;padding:8px 10px;font-size:.9rem" min="1" max="10" value="9">
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-size:.82rem">🩸 Règles ≥ (alerte si au-dessus)</label>
+        <input type="number" id="alert-period" class="form-input" style="width:80px;padding:8px 10px;font-size:.9rem" min="1" max="10" value="7">
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-size:.82rem">😊 Humeur ≤ (alerte si en dessous)</label>
+        <input type="number" id="alert-mood" class="form-input" style="width:80px;padding:8px 10px;font-size:.9rem" min="1" max="10" value="3">
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-size:.82rem">😴 Sommeil ≤ (alerte si en dessous)</label>
+        <input type="number" id="alert-sleep" class="form-input" style="width:80px;padding:8px 10px;font-size:.9rem" min="1" max="10" value="3">
+      </div>
+      <button class="btn btn-outline btn-sm mt-8" onclick="saveAlertThresholds()">💾 Enregistrer les seuils</button>
+    </div>
+
+    <!-- Sécurité & Export -->
+    <div class="card">
+      <h3 class="mb-12">🔐 Changer le PIN</h3>
+      <div class="form-group">
+        <input type="password" id="new-pin" class="form-input" maxlength="4" inputmode="numeric" placeholder="Nouveau PIN (4 chiffres)">
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="changePin()">Modifier le PIN</button>
+    </div>
+    <div class="card">
+      <h3 class="mb-12">📤 Export des données</h3>
+      <div class="form-group">
+        <label class="form-label">Période</label>
+        <div style="display:flex;gap:8px">
+          <input type="date" id="export-from" class="form-input" style="flex:1;padding:8px 10px;font-size:.85rem">
+          <span style="align-self:center;color:var(--muted)">→</span>
+          <input type="date" id="export-to" class="form-input" style="flex:1;padding:8px 10px;font-size:.85rem">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Équipe</label>
+        <select id="export-equipe" class="form-select" style="padding:8px 10px;font-size:.85rem">
+          <option value="all">Toutes</option>
+          <option value="A">Équipe A</option>
+          <option value="B">Équipe B</option>
+        </select>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="exportCSV()">Télécharger CSV</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== PLAYER REPORT ======== -->
+<div id="screen-player-report" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('dashboard')">←</button>
+    <div>
+      <h1 id="pr-name"></h1>
+      <p class="text-muted">Rapport individuel</p>
+    </div>
+    <button onclick="exportPlayerPDF()" style="margin-left:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:.78rem;cursor:pointer;color:var(--primary);font-weight:700">📄 PDF</button>
+  </div>
+  <div id="pr-content"></div>
+</div>
+
+<!-- ======== EDIT PLAYER ======== -->
+<div id="screen-edit-player" class="screen">
+  <div class="header">
+    <button class="back-btn" onclick="showScreen('dashboard');switchTab('config')">←</button>
+    <h1>Modifier la joueuse</h1>
+  </div>
+  <div class="card">
+    <div class="form-group">
+      <label class="form-label">Nom complet</label>
+      <input type="text" id="edit-name" class="form-input">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Équipe</label>
+      <select id="edit-equipe" class="form-select">
+        <option value="A">Équipe A</option>
+        <option value="B">Équipe B</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Heure questionnaire matin</label>
+      <input type="time" id="edit-morning" class="form-input">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Jours d'entraînement</label>
+      <div class="toggle-group" id="edit-days">
+        <button class="toggle-day" data-day="lundi">Lun</button>
+        <button class="toggle-day" data-day="mardi">Mar</button>
+        <button class="toggle-day" data-day="mercredi">Mer</button>
+        <button class="toggle-day" data-day="jeudi">Jeu</button>
+        <button class="toggle-day" data-day="vendredi">Ven</button>
+        <button class="toggle-day" data-day="samedi">Sam</button>
+        <button class="toggle-day" data-day="dimanche">Dim</button>
+      </div>
+    </div>
+    <div id="edit-days-detail"></div>
+    <div class="form-group" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <label class="form-label">Notifications push</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button id="edit-notif-toggle" class="btn btn-sm" onclick="toggleEditNotif()" style="width:auto"></button>
+        <span id="edit-notif-label" class="text-muted" style="font-size:.8rem"></span>
+      </div>
+    </div>
+    <button class="btn btn-primary mt-12" onclick="saveEditPlayer()">💾 Enregistrer</button>
+  </div>
+</div>
+
+<script>
+/* ==========================================================
+   DATABASE (LocalStorage)
+   ========================================================== */
+const DB = {
+  get(k, d=null){
+    try{ return JSON.parse(localStorage.getItem(k))??d; }
+    catch(e){
+      if(e.name==='SecurityError'){
+        document.body.innerHTML='<div style="padding:40px;text-align:center;font-family:sans-serif"><h2>⚠️ Stockage désactivé</h2><p>Désactivez la navigation privée ou autorisez les données de site pour utiliser RPE Suivi.</p></div>';
+      }
+      return d;
+    }
+  },
+  set(k,v){
+    try{
+      localStorage.setItem(k,JSON.stringify(v));
+    } catch(e){
+      if(e.name==='QuotaExceededError'){
+        // Purge automatique des réponses > 6 mois
+        const cutoff = new Date();
+        cutoff.setMonth(cutoff.getMonth()-6);
+        const cutStr = cutoff.toISOString().split('T')[0];
+        const pruned = DB.get('responses',[]).filter(r=>r.date>=cutStr);
+        try{
+          localStorage.setItem('responses',JSON.stringify(pruned));
+          localStorage.setItem(k,JSON.stringify(v));
+        } catch(e2){
+          alert('⚠️ Stockage plein même après purge.\nExportez vos données CSV depuis le tableau de bord Staff.');
+        }
+      }
+    }
+  }
+};
+const getPlayers  = ()=>DB.get('players',[]);
+const getResponses= ()=>DB.get('responses',[]);
+const getSettings = ()=>DB.get('settings',{pin:'1234',notif:false});
+const getQConfig  = ()=>DB.get('qconfig', DEFAULT_QCONFIG());
+
+/* ==========================================================
+   DEFAULT QUESTION CONFIG
+   ========================================================== */
+function DEFAULT_QCONFIG(){
+  return {
+    morning:[
+      {id:'q_sleep',   active:true, label:'Qualité du sommeil ?',                      type:'borg',  hint:'1 = très mauvais → 10 = excellent'},
+      {id:'q_fatigue', active:true, label:'Niveau de fatigue / énergie ?',              type:'borg',  hint:'1 = épuisé(e) → 10 = très reposé(e)'},
+      {id:'q_pain',    active:true, label:'Avez-vous des douleurs physiques ?',          type:'yn',    hint:''},
+      {id:'q_mood',    active:true, label:'Humeur générale ?',                           type:'borg',  hint:'1 = très mauvaise → 10 = excellente'},
+      {id:'q_period',  active:true, label:'Jour de règle ? (0 = non, 1-10 = intensité)',type:'borg0', hint:'0 = pas de règle, 1 = léger → 10 = très douloureux'},
+    ],
+    training:[
+      {id:'q_rpe',          active:true, label:'Intensité perçue de la séance (RPE) ?',   type:'borg', hint:'1 = très légère → 10 = maximale'},
+      {id:'q_session_score',active:true, label:'Note globale de la séance ?',             type:'borg', hint:'1 = très mauvaise → 10 = excellente'},
+    ]
+  };
+}
+
+/* ==========================================================
+   STATE
+   ========================================================== */
+let currentPlayer   = null;
+let currentQType    = null;
+let currentSession  = null;
+let questAnswers    = {};
+let reminderTimers  = {};
+
+/* ==========================================================
+   NAVIGATION
+   ========================================================== */
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  window.scrollTo(0,0);
+}
+function goToPlayerSelect(){
+  // Sync equipe buttons with stored value
+  const eq = sessionStorage.getItem('currentEquipe')||'A';
+  currentEquipe = eq;
+  const btnA = document.getElementById('btn-equipe-A');
+  const btnB = document.getElementById('btn-equipe-B');
+  if(btnA) btnA.className = eq==='A'?'btn btn-primary btn-sm':'btn btn-outline btn-sm';
+  if(btnB) btnB.className = eq==='B'?'btn btn-primary btn-sm':'btn btn-outline btn-sm';
+  renderPlayerList();
+  showScreen('player-select');
+}
+function goToStaffLogin(){
+  ['p1','p2','p3','p4'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pin-error').classList.add('hidden');
+  // Affiche l'indice PIN par défaut seulement si le PIN n'a jamais été changé
+  const hint = document.getElementById('pin-default-hint');
+  const settings = getSettings();
+  if(hint){
+    if(!settings.pinHash){
+      hint.innerHTML='PIN par défaut : <strong>1234</strong> (modifiable dans les paramètres)';
+    } else {
+      hint.textContent='';
+    }
+  }
+  showScreen('staff-login');
+}
+
+/* ==========================================================
+   PLAYER LIST
+   ========================================================== */
+let currentEquipe = sessionStorage.getItem('currentEquipe')||'A';
+
+function selectEquipe(eq){
+  currentEquipe = eq;
+  sessionStorage.setItem('currentEquipe', eq);
+  document.getElementById('btn-equipe-A').className = eq==='A'?'btn btn-primary btn-sm':'btn btn-outline btn-sm';
+  document.getElementById('btn-equipe-B').className = eq==='B'?'btn btn-primary btn-sm':'btn btn-outline btn-sm';
+  renderPlayerList();
+}
+
+function renderPlayerList(){
+  const allPlayers = getPlayers();
+  const players = allPlayers.filter(p=>(p.equipe||'A')===currentEquipe);
+  const c = document.getElementById('player-list-container');
+  const today = todayKey();
+  const responses = getResponses();
+  const days7 = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const todayName = days7[new Date().getDay()];
+
+  if(!players.length){
+    c.innerHTML=`<div class="alert alert-info">Aucune joueuse configurée. Le staff doit d'abord les ajouter dans la configuration.</div>`;
+    return;
+  }
+  c.innerHTML = players.map(p=>{
+    const mDone = responses.some(r=>r.playerId===p.id&&r.date===today&&r.type==='morning');
+    const tDone = responses.some(r=>r.playerId===p.id&&r.date===today&&r.type==='training');
+    const hasT  = p.trainingDays?.[todayName]?.active;
+    const sType = p.trainingDays?.[todayName]?.type==='physique'?'🏋️':'🏐';
+    return `
+    <div class="player-item" onclick="selectPlayer('${p.id}')">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="player-avatar">${p.name.charAt(0).toUpperCase()}</div>
+        <div>
+          <div class="bold">${escHtml(p.name)}</div>
+          <div class="status-row">
+            <span class="status-pill ${mDone?'pill-done':'pill-pending'}">${mDone?'✓':'○'} Matin</span>
+            ${hasT?`<span class="status-pill ${tDone?'pill-done':'pill-pending'}">${tDone?'✓':'○'} ${sType} Séance</span>`:`<span class="status-pill pill-na">Pas d'entraînement</span>`}
+          </div>
+        </div>
+      </div>
+      <span style="color:var(--muted);font-size:1.2rem">›</span>
+    </div>`;
+  }).join('');
+}
+
+function selectPlayer(pid){
+  currentPlayer = getPlayers().find(p=>p.id===pid);
+  if(!currentPlayer) return;
+  const today = todayKey();
+  const resp  = getResponses();
+  const days7 = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const todayName = days7[new Date().getDay()];
+  const mDone = resp.some(r=>r.playerId===pid&&r.date===today&&r.type==='morning');
+  const hasT  = currentPlayer.trainingDays?.[todayName]?.active;
+  const dayCfg = currentPlayer.trainingDays?.[todayName];
+  const sessions = dayCfg?.sessions||(dayCfg?.active?[{id:'s0',type:dayCfg.type||'volley',endTime:dayCfg.endTime||'20:00',label:'Séance'}]:[]);
+  const pendingSessions = hasT ? sessions.filter(s=>!resp.some(r=>r.playerId===pid&&r.date===today&&r.type==='training'&&r.sessionId===s.id)) : [];
+
+  if(mDone && pendingSessions.length===0){
+    document.getElementById('success-message').textContent=`Tous vos questionnaires du jour sont déjà remplis. Merci ${firstName(currentPlayer.name)} ! 🎉`;
+    showScreen('success');
+    return;
+  }
+  if(!mDone && pendingSessions.length===0){ startQuestionnaire('morning',null); return; }
+  if(mDone && pendingSessions.length===1){ startQuestionnaire('training',pendingSessions[0]); return; }
+
+  document.getElementById('choice-player-name').textContent = `Bonjour ${escHtml(firstName(currentPlayer.name))} 👋`;
+  // Stocke les sessions en mémoire pour éviter l'injection via innerHTML
+  window._pendingSessions = pendingSessions;
+  let btns = '';
+  if(!mDone) btns += `<button class="btn btn-primary mb-12" onclick="startQuestionnaire('morning',null)">🌅 Bien-être Matinal</button>`;
+  pendingSessions.forEach((s,i)=>{
+    const icon = s.type==='physique'?'🏋️':'🏐';
+    btns += `<button class="btn btn-secondary mb-12" onclick="startQuestionnaire('training',window._pendingSessions[${i}])">${icon} Charge — ${escHtml(s.label||'Séance')}</button>`;
+  });
+  document.getElementById('quest-choice-content').innerHTML = `<div class="card"><p class="text-muted mb-16">Quel questionnaire souhaitez-vous remplir ?</p>${btns}</div>`;
+  showScreen('quest-choice');
+}
+
+/* ==========================================================
+   QUESTIONNAIRE
+   ========================================================== */
+function startQuestionnaire(type, session){
+  currentQType   = type;
+  currentSession = session||null;
+  questAnswers   = {};
+  const qcfg     = getQConfig();
+  const activeQs = qcfg[type].filter(q=>q.active);
+  const sType    = session?.type||currentPlayer?.trainingDays?.[['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'][new Date().getDay()]]?.type;
+  const sLabel   = session?.label||(sType==='physique'?'Séance Physique':'Séance Volley');
+  const sIcon    = sType==='physique'?'🏋️':'🏐';
+  const title    = type==='morning'?'🌅 Bien-être Matinal':`${sIcon} ${sLabel}`;
+  const sub      = type==='morning'?new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}):'Charge d\'entraînement';
+  document.getElementById('quest-title').textContent = title;
+  document.getElementById('quest-subtitle').textContent = sub;
+  renderQuestions(activeQs);
+  showScreen('questionnaire');
+}
+
+function renderQuestions(qs){
+  const c = document.getElementById('quest-questions-container');
+  c.innerHTML = qs.map((q,i)=>`
+    <div class="question" id="qblock-${q.id}">
+      <div class="question-label">${i+1}. ${q.label}</div>
+      ${q.hint?`<div class="question-hint">${q.hint}</div>`:''}
+      ${q.type==='borg'  ? renderBorg(q.id,1,10)  : ''}
+      ${q.type==='borg0' ? renderBorg(q.id,0,10)  : ''}
+      ${q.type==='yn'    ? renderYN(q.id)          : ''}
+    </div>
+  `).join('') + `
+    <div class="question" id="qblock-comment">
+      <div class="question-label">${qs.length+1}. Commentaire (optionnel)</div>
+      <textarea class="comment-area" id="quest-comment" placeholder="Remarque libre, douleur précise, contexte…" oninput="updateProgress(${qs.length})"></textarea>
+    </div>`;
+  document.getElementById('btn-submit').classList.add('hidden');
+  updateProgress(qs.length);
+}
+
+function renderBorg(qid, min, max){
+  const vals = Array.from({length:max-min+1},(_,i)=>i+min);
+  const cols = vals.length<=6?vals.length:5;
+  return `<div class="borg-scale" style="grid-template-columns:repeat(${cols},1fr)">
+    ${vals.map(v=>`<button class="borg-btn" data-val="${v}" data-qid="${qid}" onclick="selectBorg('${qid}',${v})">${v}</button>`).join('')}
+  </div>`;
+}
+function renderYN(qid){
+  return `<div class="yn-group">
+    <button class="yn-btn yes" data-qid="${qid}" onclick="selectYN('${qid}',true)">✅ Oui</button>
+    <button class="yn-btn no"  data-qid="${qid}" onclick="selectYN('${qid}',false)">❌ Non</button>
+  </div>`;
+}
+function selectBorg(qid,val){
+  questAnswers[qid]=val;
+  document.querySelectorAll(`.borg-btn[data-qid="${qid}"]`).forEach(b=>{
+    b.classList.toggle('selected',parseInt(b.dataset.val)===val);
+  });
+  document.getElementById('qblock-'+qid)?.classList.add('answered');
+  const qcfg = getQConfig();
+  updateProgress(qcfg[currentQType].filter(q=>q.active).length);
+}
+function selectYN(qid,val){
+  questAnswers[qid]=val;
+  document.querySelectorAll(`.yn-btn[data-qid="${qid}"]`).forEach(b=>b.classList.remove('selected'));
+  const cls = val?'yes':'no';
+  document.querySelector(`.yn-btn.${cls}[data-qid="${qid}"]`).classList.add('selected');
+  document.getElementById('qblock-'+qid)?.classList.add('answered');
+  const qcfg = getQConfig();
+  updateProgress(qcfg[currentQType].filter(q=>q.active).length);
+}
+function updateProgress(total){
+  const answered = Object.keys(questAnswers).length;
+  const pct = total>0 ? Math.round((answered/total)*100) : 100;
+  document.getElementById('quest-progress').style.width = pct+'%';
+  document.getElementById('quest-progress-label').textContent = `Question ${answered}/${total}`;
+  document.getElementById('quest-progress-pct').textContent = pct+'%';
+  document.getElementById('btn-submit').classList.toggle('hidden', answered<total);
+}
+function submitQuestionnaire(){
+  const qcfg = getQConfig();
+  const activeQs = qcfg[currentQType].filter(q=>q.active);
+  if(Object.keys(questAnswers).length < activeQs.length){alert('Veuillez répondre à toutes les questions.');return;}
+  const days7 = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const todayN = days7[new Date().getDay()];
+  const sType = currentPlayer?.trainingDays?.[todayN]?.type||'volley';
+  const comment = document.getElementById('quest-comment')?.value?.trim()||'';
+  const resp = {
+    id: Date.now().toString(),
+    playerId: currentPlayer.id,
+    playerName: currentPlayer.name,
+    date: todayKey(),
+    type: currentQType,
+    sessionId: currentSession?.id||null,
+    sessionLabel: currentSession?.label||null,
+    sessionType: currentQType==='training'?(currentSession?.type||sType):null,
+    answers: {...questAnswers},
+    comment,
+    timestamp: new Date().toISOString()
+  };
+  const all = getResponses();
+  all.push(resp);
+  DB.set('responses',all);
+  cancelReminder(currentPlayer.id, currentQType, currentSession);
+  const typeLabel = currentQType==='morning'?'Bien-être Matinal':'Charge de Séance';
+  document.getElementById('success-message').textContent = `"${typeLabel}" enregistré. Merci ${firstName(currentPlayer.name)} ! 🎉`;
+  showScreen('success');
+}
+
+/* ==========================================================
+   STAFF PIN
+   ========================================================== */
+function pinMove(inp,nextId){
+  if(inp.value.length===1&&nextId) document.getElementById(nextId).focus();
+  if(!nextId) checkPin();
+}
+function pinDel(e,inp,prevId){
+  if(e.key==='Backspace'&&inp.value===''&&prevId) document.getElementById(prevId).focus();
+}
+// ── Sécurité PIN ──────────────────────────────────────────
+async function hashPin(pin){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+let _pinAttempts = 0;
+let _pinLockedUntil = 0;
+
+async function checkPin(){
+  const now = Date.now();
+  if(now < _pinLockedUntil){
+    const secs = Math.ceil((_pinLockedUntil - now)/1000);
+    document.getElementById('pin-error').textContent = `⛔ Trop de tentatives. Réessayez dans ${secs}s.`;
+    document.getElementById('pin-error').classList.remove('hidden');
+    return;
+  }
+  const pin = ['p1','p2','p3','p4'].map(id=>document.getElementById(id).value).join('');
+  if(pin.length!==4) return;
+  const hashed = await hashPin(pin);
+  const settings = getSettings();
+  // Support legacy plain PIN (first run)
+  const stored = settings.pinHash || await hashPin(settings.pin||'1234');
+  if(hashed === stored){
+    _pinAttempts = 0;
+    // Auto-migration : si le PIN est encore en clair, on le hashe maintenant
+    if(!settings.pinHash){
+      settings.pinHash = hashed;
+      delete settings.pin;
+      DB.set('settings', settings);
+    }
+    // Auto-logout after 30 min inactivity
+    resetStaffTimeout();
+    showScreen('dashboard');
+    setDashboardDate(0);
+    loadDashboard();
+    renderConfigTab();
+  } else if(pin.length===4){
+    _pinAttempts++;
+    if(_pinAttempts >= 3){
+      _pinLockedUntil = Date.now() + 30000;
+      _pinAttempts = 0;
+      document.getElementById('pin-error').textContent = '⛔ 3 tentatives échouées. Bloqué 30 secondes.';
+    } else {
+      document.getElementById('pin-error').textContent = `❌ Code incorrect (${_pinAttempts}/3 tentatives).`;
+    }
+    document.getElementById('pin-error').classList.remove('hidden');
+    ['p1','p2','p3','p4'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('p1').focus();
+  }
+}
+
+// Auto-logout staff after 30 min
+let _staffTimer = null;
+function resetStaffTimeout(){
+  if(_staffTimer) clearTimeout(_staffTimer);
+  _staffTimer = setTimeout(()=>{
+    if(document.getElementById('screen-dashboard').classList.contains('active')||
+       document.getElementById('screen-player-report').classList.contains('active')){
+      showScreen('home');
+      alert('⏱️ Session expirée après 30 minutes d\'inactivité.');
+    }
+  }, 30*60*1000);
+}
+document.addEventListener('click', ()=>{ if(_staffTimer) resetStaffTimeout(); });
+
+
+/* ==========================================================
+   DASHBOARD
+   ========================================================== */
+let dashDate = todayKey();
+function setDashboardDate(offsetDays){
+  const d = new Date();
+  d.setDate(d.getDate()+offsetDays);
+  dashDate = d.toISOString().split('T')[0];
+  document.getElementById('dash-date-input').value = dashDate;
+  loadDashboard();
+}
+function switchTab(tab){
+  ['rapport','joueuses','config'].forEach(t=>{
+    document.getElementById('tab-'+t).classList.toggle('hidden',t!==tab);
+  });
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    t.classList.toggle('active',['rapport','joueuses','config'][i]===tab);
+  });
+  if(tab==='joueuses') renderJoueusesTab();
+  if(tab==='config')   renderConfigTab();
+}
+function loadDashboard(){
+  dashDate = document.getElementById('dash-date-input').value || todayKey();
+  const dateStr = new Date(dashDate+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('dash-date-label').textContent = dateStr;
+  renderDashStats();
+  renderMorningTable();
+  renderTrainingTable();
+  renderAlerts();
+  renderChartRPEBars();
+  renderChartSleepTrend();
+  renderChartTeamOverview();
+}
+function renderDashStats(){
+  const players = getPlayers();
+  const resp    = getResponses();
+  const mResps  = resp.filter(r=>r.date===dashDate&&r.type==='morning');
+  const tResps  = resp.filter(r=>r.date===dashDate&&r.type==='training');
+  const days7   = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const dayN    = days7[new Date(dashDate+'T12:00:00').getDay()];
+  const withT   = players.filter(p=>p.trainingDays?.[dayN]?.active);
+  const avgRPE  = avg(tResps,'q_rpe');
+  const avgSleep= avg(mResps,'q_sleep');
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="stat-card"><div class="stat-value">${mResps.length}/${players.length}</div><div class="stat-label">🌅 Matins remplis</div></div>
+    <div class="stat-card"><div class="stat-value">${tResps.length}/${withT.length}</div><div class="stat-label">💪 Charges remplies</div></div>
+    <div class="stat-card"><div class="stat-value rpe-${Math.round(avgRPE)||0}">${avgRPE||'—'}</div><div class="stat-label">📊 RPE moyen</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--secondary)">${avgSleep||'—'}</div><div class="stat-label">😴 Sommeil moyen</div></div>`;
+}
+function renderMorningTable(){
+  const players = getPlayers();
+  const mResps  = getResponses().filter(r=>r.date===dashDate&&r.type==='morning');
+  const qcfg    = getQConfig().morning.filter(q=>q.active);
+  if(!mResps.length){
+    document.getElementById('morning-table-wrap').innerHTML='<p class="text-muted" style="font-size:.85rem">Aucune donnée pour cette date.</p>';return;
+  }
+  const headers = qcfg.map(q=>`<th title="${q.label}">${q.label.substring(0,12)}…</th>`).join('')+'<th>Commentaire</th>';
+  const rows = players.map(p=>{
+    const r = mResps.find(x=>x.playerId===p.id);
+    if(!r) return `<tr><td class="bold">${firstName(p.name)}</td><td colspan="${qcfg.length+1}"><span class="badge badge-red">Non rempli</span></td></tr>`;
+    const cells = qcfg.map(q=>{
+      const v = r.answers[q.id];
+      if(v===undefined) return '<td>—</td>';
+      if(typeof v==='boolean') return `<td>${v?'⚠️ Oui':'✅ Non'}</td>`;
+      return `<td><span class="rpe-${v}">${v}</span></td>`;
+    }).join('');
+    const cmt = r.comment?`<td style="font-size:.75rem;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(r.comment)}">${escHtml(r.comment)}</td>`:'<td>—</td>';
+    return `<tr><td class="bold">${firstName(p.name)}</td>${cells}${cmt}</tr>`;
+  }).join('');
+  document.getElementById('morning-table-wrap').innerHTML=`
+    <table class="report-table">
+      <thead><tr><th>Joueuse</th>${headers}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+function renderTrainingTable(){
+  const players = getPlayers();
+  const tResps  = getResponses().filter(r=>r.date===dashDate&&r.type==='training');
+  const days7   = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const dayN    = days7[new Date(dashDate+'T12:00:00').getDay()];
+  const withT   = players.filter(p=>p.trainingDays?.[dayN]?.active);
+  const qcfg    = getQConfig().training.filter(q=>q.active);
+  if(!withT.length){
+    document.getElementById('training-table-wrap').innerHTML='<p class="text-muted" style="font-size:.85rem">Aucun entraînement prévu ce jour-là.</p>';
+    return;
+  }
+  const headers = '<th>Séance</th>'+qcfg.map(q=>`<th title="${escHtml(q.label)}">${escHtml(q.label.substring(0,10))}…</th>`).join('')+'<th>Commentaire</th>';
+  const rows = withT.flatMap(p=>{
+    const dayCfg = p.trainingDays[dayN];
+    const sessions = dayCfg.sessions||[{id:'s0',type:dayCfg.type||'volley',endTime:dayCfg.endTime||'20:00',label:'Séance'}];
+    return sessions.map((s,si)=>{
+      const r = tResps.find(x=>x.playerId===p.id&&x.sessionId===s.id)
+             || (sessions.length===1 ? tResps.find(x=>x.playerId===p.id) : null);
+      const icon  = s.type==='physique'?'🏋️':'🏐';
+      const badge = s.type==='physique'?'badge-blue':'badge-green';
+      const nameCell = si===0?`<td class="bold" rowspan="${sessions.length}">${escHtml(firstName(p.name))}</td>`:'';
+      if(!r) return `<tr>${nameCell}<td><span class="badge ${badge}">${icon} ${escHtml(s.label||'Séance')}</span></td><td colspan="${qcfg.length+1}"><span class="badge badge-red">Non rempli</span></td></tr>`;
+      const cells = qcfg.map(q=>{
+        const v=r.answers[q.id];
+        if(v===undefined) return '<td>—</td>';
+        if(typeof v==='boolean') return `<td>${v?'✅':'❌'}</td>`;
+        return `<td><span class="rpe-${v}">${v}</span></td>`;
+      }).join('');
+      const cmt = r.comment?`<td style="font-size:.75rem;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(r.comment)}">${escHtml(r.comment)}</td>`:'<td></td>';
+      return `<tr>${nameCell}<td><span class="badge ${badge}">${icon} ${escHtml(s.label||'Séance')}</span></td>${cells}${cmt}</tr>`;
+    });
+  }).join('');
+  document.getElementById('training-table-wrap').innerHTML=`
+    <table class="report-table">
+      <thead><tr><th>Joueuse</th>${headers}</tr></thead>
+      <tbody>${rows||'<tr><td colspan="'+(qcfg.length+3)+'" class="text-muted">Aucune donnée.</td></tr>'}</tbody>
+    </table>`;
+}
+function renderAlerts(){
+  const resp  = getResponses().filter(r=>r.date===dashDate);
+  const thresholds = getAlertThresholds();
+  const alerts= [];
+  resp.forEach(r=>{
+    if(r.answers.q_pain===true)                            alerts.push({name:r.playerName, msg:'🤕 Douleurs déclarées (matin)'});
+    if(r.answers.q_pain_after===true)                      alerts.push({name:r.playerName, msg:'⚠️ Douleurs post-séance'});
+    if(typeof r.answers.q_fatigue==='number'&&r.answers.q_fatigue<=thresholds.fatigue)
+      alerts.push({name:r.playerName, msg:`😴 Fatigue très élevée (${r.answers.q_fatigue}/10)`});
+    if(typeof r.answers.q_rpe==='number'&&r.answers.q_rpe>=thresholds.rpe)
+      alerts.push({name:r.playerName, msg:`🔥 RPE maximal (${r.answers.q_rpe}/10)`});
+    if(typeof r.answers.q_period==='number'&&r.answers.q_period>=thresholds.period)
+      alerts.push({name:r.playerName, msg:`🩸 Règles intenses (${r.answers.q_period}/10)`});
+    if(typeof r.answers.q_mood==='number'&&r.answers.q_mood<=thresholds.mood)
+      alerts.push({name:r.playerName, msg:`😊 Humeur basse (${r.answers.q_mood}/10)`});
+    if(typeof r.answers.q_sleep==='number'&&r.answers.q_sleep<=thresholds.sleep)
+      alerts.push({name:r.playerName, msg:`😴 Sommeil faible (${r.answers.q_sleep}/10)`});
+  });
+  const w = document.getElementById('alerts-wrap');
+  if(!alerts.length){w.innerHTML='<p class="text-muted" style="font-size:.85rem">✅ Aucune alerte pour cette journée.</p>';return;}
+  w.innerHTML = alerts.map(a=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <div class="player-avatar" style="width:32px;height:32px;font-size:.85rem">${a.name.charAt(0)}</div>
+      <div><span class="bold" style="font-size:.85rem">${firstName(a.name)}</span> — ${a.msg}</div>
+    </div>`).join('');
+}
+
+// === SEUILS D'ALERTE ===
+function getAlertThresholds(){
+  return DB.get('alertThresholds', {fatigue:3, rpe:9, period:7, mood:3, sleep:3});
+}
+function saveAlertThresholds(){
+  const t = {
+    fatigue: parseInt(document.getElementById('alert-fatigue')?.value)||3,
+    rpe:     parseInt(document.getElementById('alert-rpe')?.value)||9,
+    period:  parseInt(document.getElementById('alert-period')?.value)||7,
+    mood:    parseInt(document.getElementById('alert-mood')?.value)||3,
+    sleep:   parseInt(document.getElementById('alert-sleep')?.value)||3
+  };
+  DB.set('alertThresholds', t);
+  alert('✅ Seuils d\'alerte enregistrés !');
+  // Recharge les alertes si on est sur le dashboard
+  if(document.getElementById('screen-dashboard').classList.contains('active')) renderAlerts();
+}
+function loadAlertThresholdsUI(){
+  const t = getAlertThresholds();
+  const ids = {fatigue:'alert-fatigue',rpe:'alert-rpe',period:'alert-period',mood:'alert-mood',sleep:'alert-sleep'};
+  Object.entries(ids).forEach(([k,id])=>{
+    const el = document.getElementById(id);
+    if(el) el.value = t[k];
+  });
+}
+// === FIN SEUILS D'ALERTE ===
+
+/* ==========================================================
+   DASHBOARD CHARTS
+   ========================================================== */
+
+// === AJOUT BILAN CHARGE === Sous-onglet switching
+function switchRapportSubtab(sub){
+  document.getElementById('rapport-bienetre').classList.toggle('hidden', sub!=='bienetre');
+  document.getElementById('rapport-charge').classList.toggle('hidden', sub!=='charge');
+  document.getElementById('subtab-bienetre').className = sub==='bienetre'?'btn btn-sm btn-primary':'btn btn-sm btn-ghost';
+  document.getElementById('subtab-charge').className   = sub==='charge'?'btn btn-sm btn-primary':'btn btn-sm btn-ghost';
+  if(sub==='charge') initBilanCharge();
+}
+function initBilanCharge(){
+  const sel = document.getElementById('charge-player-select');
+  const players = getPlayers();
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">— Choisir une joueuse —</option>' +
+    players.map(p=>`<option value="${p.id}">${escHtml(p.name)} (Éq. ${escHtml(p.equipe||'A')})</option>`).join('');
+  if(currentVal && players.find(p=>p.id===currentVal)) sel.value = currentVal;
+  if(sel.value) renderBilanCharge();
+}
+
+// === AJOUT BILAN CHARGE === Instances Chart.js (pour destroy avant re-render)
+let _chartCharge14j = null;
+let _chartGroupeVolley = null;
+let _chartIndivVolley = null;
+
+// === AJOUT BILAN CHARGE === Durée séance depuis la config (minutes)
+function getSessionDuration(player, date, resp){
+  const dayNames = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const dayN = dayNames[new Date(date+'T12:00:00').getDay()];
+  const dayCfg = player.trainingDays?.[dayN];
+  if(!dayCfg?.active) return 90;
+  const sessions = dayCfg.sessions||[{id:'s0',type:dayCfg.type||'volley',endTime:dayCfg.endTime||'20:00',duration:90}];
+  // Trouve la séance correspondante via sessionId
+  if(resp?.sessionId){
+    const match = sessions.find(s=>s.id===resp.sessionId);
+    if(match) return match.duration||90;
+  }
+  // Fallback : première séance ou défaut
+  return sessions[0]?.duration||90;
+}
+
+// === AJOUT BILAN CHARGE === Rendu principal
+function renderBilanCharge(){
+  const pid = document.getElementById('charge-player-select').value;
+  if(!pid){
+    document.getElementById('bilan-charge-content').classList.add('hidden');
+    document.getElementById('bilan-charge-empty').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('bilan-charge-content').classList.remove('hidden');
+  document.getElementById('bilan-charge-empty').classList.add('hidden');
+
+  renderChartCharge14j(pid);
+  renderWeekComparison(pid);
+  renderChartGroupeVolley(pid);
+  renderChartIndivVolley(pid);
+}
+
+// === AJOUT BILAN CHARGE === Graphique 1 : Charge individuelle 14 jours
+function renderChartCharge14j(pid){
+  const player = getPlayers().find(p=>p.id===pid);
+  if(!player) return;
+  const resp = getResponses();
+  const last14 = getLastNDays(14);
+
+  // Couleurs par type/créneau
+  const COLOR_VOLLEY_1  = '#8B5E3C';
+  const COLOR_VOLLEY_2  = '#F97B2B';
+  const COLOR_PHYSIQUE  = '#C47A3A';
+
+  // Pour chaque jour : trouver les réponses training de cette joueuse
+  const dayData = last14.map(date=>{
+    const dayResps = resp.filter(r=>r.playerId===pid&&r.date===date&&r.type==='training');
+    // Trier par timestamp pour distinguer créneau 1 et 2
+    dayResps.sort((a,b)=>(a.timestamp||'').localeCompare(b.timestamp||''));
+    let volley1 = null, volley2 = null, physique = null;
+    let volleyCount = 0;
+    dayResps.forEach(r=>{
+      const rpe = r.answers?.q_rpe||0;
+      const dur = getSessionDuration(player, date, r);
+      const charge = rpe * dur;
+      const sType = (r.sessionType||'volley').toLowerCase();
+      if(sType==='physique'){
+        physique = (physique||0) + charge;
+      } else {
+        volleyCount++;
+        if(volleyCount===1) volley1 = charge;
+        else volley2 = (volley2||0) + charge;
+      }
+    });
+    return {date, volley1, volley2, physique};
+  });
+
+  const labels = last14.map(d=>{
+    const dt = new Date(d+'T12:00:00');
+    return dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+  });
+
+  // Destroy previous chart
+  if(_chartCharge14j){ _chartCharge14j.destroy(); _chartCharge14j=null; }
+
+  const ctx = document.getElementById('chart-charge-14j').getContext('2d');
+  _chartCharge14j = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {
+          label:'Volley (créneau 1)',
+          data:dayData.map(d=>d.volley1||0),
+          backgroundColor:COLOR_VOLLEY_1,
+          borderRadius:4,
+          stack:'stack0'
+        },
+        {
+          label:'Volley (créneau 2)',
+          data:dayData.map(d=>d.volley2||0),
+          backgroundColor:COLOR_VOLLEY_2,
+          borderRadius:4,
+          stack:'stack0'
+        },
+        {
+          label:'Physique',
+          data:dayData.map(d=>d.physique||0),
+          backgroundColor:COLOR_PHYSIQUE,
+          borderRadius:4,
+          stack:'stack0'
+        }
+      ]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:true,
+      aspectRatio:1.6,
+      plugins:{
+        legend:{position:'bottom',labels:{boxWidth:12,font:{size:11},color:getComputedStyle(document.body).getPropertyValue('--text')}},
+        tooltip:{
+          callbacks:{
+            label:function(ctx){return `${ctx.dataset.label}: ${ctx.raw} UA`;}
+          }
+        }
+      },
+      scales:{
+        x:{
+          stacked:true,
+          ticks:{font:{size:10},color:getComputedStyle(document.body).getPropertyValue('--muted'),maxRotation:45},
+          grid:{display:false}
+        },
+        y:{
+          stacked:true,
+          beginAtZero:true,
+          title:{display:true,text:'Charge (UA = RPE × min)',font:{size:11},color:getComputedStyle(document.body).getPropertyValue('--muted')},
+          ticks:{font:{size:10},color:getComputedStyle(document.body).getPropertyValue('--muted')},
+          grid:{color:getComputedStyle(document.body).getPropertyValue('--border')}
+        }
+      }
+    }
+  });
+}
+
+// === AJOUT BILAN CHARGE === Graphique 2a : RPE moyen du groupe — 10 dernières séances Volley
+// === AJOUT BILAN CHARGE === Comparaison semaine actuelle vs précédente
+function renderWeekComparison(pid){
+  const el = document.getElementById('week-comparison-wrap');
+  const player = getPlayers().find(p=>p.id===pid);
+  if(!player){el.innerHTML='';return;}
+  const resp = getResponses().filter(r=>r.playerId===pid&&r.type==='training');
+
+  // Semaine actuelle = 7 derniers jours, semaine précédente = J-14 à J-8
+  const thisWeek = getLastNDays(7);
+  const prevWeek = Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-13+i);return d.toISOString().split('T')[0];});
+
+  function weekStats(days){
+    const wResps = resp.filter(r=>days.includes(r.date));
+    const totalCharge = wResps.reduce((s,r)=>{
+      const rpe = r.answers?.q_rpe||0;
+      const dur = getSessionDuration(player, r.date, r);
+      return s + rpe*dur;
+    },0);
+    const rpeVals = wResps.map(r=>r.answers?.q_rpe).filter(v=>typeof v==='number');
+    const avgRPE = rpeVals.length ? (rpeVals.reduce((a,b)=>a+b,0)/rpeVals.length) : null;
+    return {total:totalCharge, avgRPE, sessions:wResps.length};
+  }
+
+  const curr = weekStats(thisWeek);
+  const prev = weekStats(prevWeek);
+
+  function delta(a,b){
+    if(b===null||b===0) return {pct:null, arrow:'—', color:'var(--muted)'};
+    const pct = ((a-b)/b)*100;
+    const arrow = pct>0?'↑':pct<0?'↓':'→';
+    const color = Math.abs(pct)>30?'#ef4444':Math.abs(pct)>15?'#f59e0b':'#10b981';
+    return {pct:pct.toFixed(0), arrow, color};
+  }
+
+  const dCharge = delta(curr.total, prev.total);
+  const dRPE = delta(curr.avgRPE, prev.avgRPE);
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="background:var(--bg);border-radius:10px;padding:14px;text-align:center">
+        <div class="text-muted" style="font-size:.7rem;margin-bottom:6px">Sem. précédente</div>
+        <div class="bold" style="font-size:1.1rem">${prev.total} <span style="font-size:.7rem;font-weight:400">UA</span></div>
+        <div style="font-size:.78rem;color:var(--muted);margin-top:4px">${prev.sessions} séances · RPE moy ${prev.avgRPE!==null?prev.avgRPE.toFixed(1):'—'}</div>
+      </div>
+      <div style="background:var(--bg);border-radius:10px;padding:14px;text-align:center">
+        <div class="text-muted" style="font-size:.7rem;margin-bottom:6px">Sem. actuelle</div>
+        <div class="bold" style="font-size:1.1rem">${curr.total} <span style="font-size:.7rem;font-weight:400">UA</span></div>
+        <div style="font-size:.78rem;color:var(--muted);margin-top:4px">${curr.sessions} séances · RPE moy ${curr.avgRPE!==null?curr.avgRPE.toFixed(1):'—'}</div>
+      </div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:10px;justify-content:center">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 16px;text-align:center">
+        <div class="text-muted" style="font-size:.68rem">Δ Charge</div>
+        <div style="font-size:1rem;font-weight:800;color:${dCharge.color}">${dCharge.pct!==null?dCharge.arrow+' '+dCharge.pct+'%':'—'}</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 16px;text-align:center">
+        <div class="text-muted" style="font-size:.68rem">Δ RPE moy</div>
+        <div style="font-size:1rem;font-weight:800;color:${dRPE.color}">${dRPE.pct!==null?dRPE.arrow+' '+dRPE.pct+'%':'—'}</div>
+      </div>
+    </div>
+    ${dCharge.pct!==null&&Math.abs(parseFloat(dCharge.pct))>30?`<div style="margin-top:10px;padding:10px 14px;border-radius:10px;background:#fef2f2;border:1px solid #fecaca;font-size:.82rem;color:#991b1b">⚠️ Variation de charge supérieure à 30% — risque accru de blessure.</div>`:''}
+  `;
+}
+
+function renderChartGroupeVolley(pid){
+  const resp = getResponses();
+  // Trouver toutes les séances Volley
+  const volleyResps = resp.filter(r=>r.type==='training'&&(r.sessionType||'volley').toLowerCase()!=='physique');
+
+  // Grouper par date+sessionId pour identifier chaque "séance"
+  const sessMap = {};
+  volleyResps.forEach(r=>{
+    const key = r.date + '|' + (r.sessionId||'s0');
+    if(!sessMap[key]) sessMap[key] = {date:r.date, label:r.sessionLabel||'Volley', resps:[]};
+    sessMap[key].resps.push(r);
+  });
+
+  // Trier par date décroissante, prendre les 10 dernières
+  const sessions = Object.values(sessMap).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10).reverse();
+
+  if(!sessions.length){
+    if(_chartGroupeVolley){_chartGroupeVolley.destroy();_chartGroupeVolley=null;}
+    document.getElementById('chart-groupe-volley').parentElement.querySelector('p').textContent='Aucune séance Volley enregistrée.';
+    return;
+  }
+
+  const labels = sessions.map(s=>{
+    const dt = new Date(s.date+'T12:00:00');
+    return dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+  });
+  const avgData = sessions.map(s=>{
+    const vals = s.resps.map(r=>r.answers?.q_rpe).filter(v=>typeof v==='number');
+    return vals.length ? parseFloat((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1)) : 0;
+  });
+
+  if(_chartGroupeVolley){_chartGroupeVolley.destroy();_chartGroupeVolley=null;}
+
+  const ctx = document.getElementById('chart-groupe-volley').getContext('2d');
+  _chartGroupeVolley = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'RPE moyen du groupe',
+        data:avgData,
+        backgroundColor:avgData.map(v=>valColor(v)),
+        borderRadius:6,
+        barPercentage:0.7
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:true,
+      aspectRatio:1.8,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label:function(ctx){
+              const s = sessions[ctx.dataIndex];
+              return `Moy: ${ctx.raw}/10 (${s.resps.length} joueuses)`;
+            }
+          }
+        }
+      },
+      scales:{
+        x:{
+          ticks:{font:{size:10},color:getComputedStyle(document.body).getPropertyValue('--muted')},
+          grid:{display:false}
+        },
+        y:{
+          beginAtZero:true,
+          max:10,
+          title:{display:true,text:'RPE moyen',font:{size:11},color:getComputedStyle(document.body).getPropertyValue('--muted')},
+          ticks:{font:{size:10},color:getComputedStyle(document.body).getPropertyValue('--muted'),stepSize:2},
+          grid:{color:getComputedStyle(document.body).getPropertyValue('--border')}
+        }
+      }
+    }
+  });
+
+  // === AJOUT BILAN CHARGE === Graphique 2b : RPE individuel
+  renderChartIndivVolleyWithSessions(pid, sessions);
+}
+
+// === AJOUT BILAN CHARGE === Graphique 2b : RPE individuel — mêmes séances que 2a
+function renderChartIndivVolley(pid){
+  // Called from renderBilanCharge, but actual data uses same sessions from groupe
+  // So we delegate to renderChartGroupeVolley which calls renderChartIndivVolleyWithSessions
+}
+function renderChartIndivVolleyWithSessions(pid, sessions){
+  const labels = sessions.map(s=>{
+    const dt = new Date(s.date+'T12:00:00');
+    return dt.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'});
+  });
+
+  // RPE individuel de la joueuse
+  const indivData = sessions.map(s=>{
+    const r = s.resps.find(x=>x.playerId===pid);
+    return r?.answers?.q_rpe??null;
+  });
+
+  // RPE moyen du groupe (pour comparaison)
+  const avgData = sessions.map(s=>{
+    const vals = s.resps.map(r=>r.answers?.q_rpe).filter(v=>typeof v==='number');
+    return vals.length ? parseFloat((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1)) : null;
+  });
+
+  if(_chartIndivVolley){_chartIndivVolley.destroy();_chartIndivVolley=null;}
+
+  const mutedColor = getComputedStyle(document.body).getPropertyValue('--muted');
+  const ctx = document.getElementById('chart-indiv-volley').getContext('2d');
+  _chartIndivVolley = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {
+          label:'RPE individuel',
+          data:indivData,
+          backgroundColor:indivData.map(v=>v!==null?valColor(v):'transparent'),
+          borderRadius:6,
+          barPercentage:0.5,
+          order:2
+        },
+        {
+          label:'Moyenne groupe',
+          data:avgData,
+          type:'line',
+          borderColor:'#6366f1',
+          backgroundColor:'rgba(99,102,241,0.1)',
+          borderWidth:2.5,
+          pointRadius:4,
+          pointBackgroundColor:'#6366f1',
+          fill:false,
+          tension:0.3,
+          order:1
+        }
+      ]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:true,
+      aspectRatio:1.8,
+      plugins:{
+        legend:{position:'bottom',labels:{boxWidth:12,font:{size:11},color:mutedColor}},
+        tooltip:{
+          callbacks:{
+            label:function(ctx){
+              if(ctx.raw===null) return 'Absent(e)';
+              return `${ctx.dataset.label}: ${ctx.raw}/10`;
+            }
+          }
+        }
+      },
+      scales:{
+        x:{
+          ticks:{font:{size:10},color:mutedColor},
+          grid:{display:false}
+        },
+        y:{
+          beginAtZero:true,
+          max:10,
+          title:{display:true,text:'RPE',font:{size:11},color:mutedColor},
+          ticks:{font:{size:10},color:mutedColor,stepSize:2},
+          grid:{color:getComputedStyle(document.body).getPropertyValue('--border')}
+        }
+      }
+    }
+  });
+}
+
+// === FIN AJOUT BILAN CHARGE ===
+function valColor(v){
+  if(v===null||v===undefined) return '#e2e8f0';
+  if(v<=2) return '#ef4444';
+  if(v<=4) return '#f97316';
+  if(v<=6) return '#f59e0b';
+  if(v<=8) return '#84cc16';
+  return '#10b981';
+}
+
+function renderChartRPEBars(){
+  const el = document.getElementById('chart-rpe-bars');
+  const players = getPlayers();
+  const resp = getResponses();
+  const last7 = getLast7Days();
+  const tResps7 = resp.filter(r=>r.type==='training'&&last7.includes(r.date));
+
+  if(!tResps7.length){
+    el.innerHTML='<p class="text-muted" style="font-size:.82rem">Aucune donnée de séance cette semaine.</p>';
+    return;
+  }
+
+  // Moyenne RPE par joueuse sur 7 jours
+  const data = players.map(p=>{
+    const pResps = tResps7.filter(r=>r.playerId===p.id);
+    const vals = pResps.map(r=>r.answers.q_rpe).filter(v=>typeof v==='number');
+    const mean = vals.length ? (vals.reduce((s,v)=>s+v,0)/vals.length) : null;
+    return {name:firstName(p.name), avg:mean, count:vals.length};
+  }).filter(d=>d.avg!==null);
+
+  if(!data.length){
+    el.innerHTML='<p class="text-muted" style="font-size:.82rem">Aucune donnée RPE cette semaine.</p>';
+    return;
+  }
+
+  const maxH = 110;
+  el.innerHTML = `
+    <div class="bar-chart">
+      ${data.map(d=>{
+        const h = (d.avg/10)*maxH;
+        const col = valColor(d.avg);
+        return `<div class="bar-group">
+          <div class="bar-stack">
+            <div class="bar" style="height:${h}px;background:${col}" title="${d.name}: ${d.avg.toFixed(1)}/10 (${d.count} séances)"></div>
+          </div>
+          <div class="bar-val" style="color:${col}">${d.avg.toFixed(1)}</div>
+          <div class="bar-name">${escHtml(d.name)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <p class="chart-axis-label">Moyenne RPE sur 7 jours par joueuse</p>`;
+}
+
+function renderChartSleepTrend(){
+  const el = document.getElementById('chart-sleep-trend');
+  const players = getPlayers();
+  const resp = getResponses();
+  const last7 = getLast7Days();
+  const dayLetters = ['D','L','Ma','Me','J','V','S'];
+
+  // Moyenne sommeil de l'équipe par jour
+  const dailyData = last7.map(date=>{
+    const mResps = resp.filter(r=>r.type==='morning'&&r.date===date);
+    const vals = mResps.map(r=>r.answers.q_sleep).filter(v=>typeof v==='number');
+    const mean = vals.length ? (vals.reduce((s,v)=>s+v,0)/vals.length) : null;
+    const dIdx = new Date(date+'T12:00:00').getDay();
+    return {date, label:dayLetters[dIdx], avg:mean, count:vals.length};
+  });
+
+  const hasData = dailyData.some(d=>d.avg!==null);
+  if(!hasData){
+    el.innerHTML='<p class="text-muted" style="font-size:.82rem">Aucune donnée de sommeil cette semaine.</p>';
+    return;
+  }
+
+  // SVG line chart
+  const w = 320, h = 140, padL = 30, padR = 10, padT = 15, padB = 25;
+  const chartW = w - padL - padR;
+  const chartH = h - padT - padB;
+  const validPts = dailyData.filter(d=>d.avg!==null);
+
+  const points = dailyData.map((d,i)=>{
+    const x = padL + (i/(dailyData.length-1))*chartW;
+    const y = d.avg!==null ? padT + chartH - (d.avg/10)*chartH : null;
+    return {x, y, ...d};
+  });
+
+  // Build SVG path for connected points
+  const linePts = points.filter(p=>p.y!==null);
+  let pathD = '';
+  linePts.forEach((p,i)=>{
+    pathD += (i===0?'M':'L') + `${p.x.toFixed(1)},${p.y.toFixed(1)} `;
+  });
+
+  // Area fill
+  let areaD = pathD;
+  if(linePts.length>1){
+    areaD += `L${linePts[linePts.length-1].x.toFixed(1)},${padT+chartH} L${linePts[0].x.toFixed(1)},${padT+chartH} Z`;
+  }
+
+  // Y axis labels
+  const yLabels = [0,2,4,6,8,10].map(v=>{
+    const y = padT + chartH - (v/10)*chartH;
+    return `<text x="${padL-4}" y="${y+3}" text-anchor="end" fill="var(--muted)" font-size="9">${v}</text>
+            <line x1="${padL}" y1="${y}" x2="${padL+chartW}" y2="${y}" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>`;
+  }).join('');
+
+  // X axis labels
+  const xLabels = points.map(p=>
+    `<text x="${p.x}" y="${h-4}" text-anchor="middle" fill="var(--muted)" font-size="9">${p.label}</text>`
+  ).join('');
+
+  // Dots
+  const dots = linePts.map(p=>
+    `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="4" fill="${valColor(p.avg)}" stroke="#fff" stroke-width="2"/>
+     <title>${p.label}: ${p.avg.toFixed(1)}/10 (${p.count} réponses)</title>`
+  ).join('');
+
+  el.innerHTML = `
+    <div class="trend-line-chart">
+      <svg class="trend-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+        ${yLabels}
+        ${xLabels}
+        ${linePts.length>1?`<path d="${areaD}" fill="var(--primary)" opacity="0.08"/>
+        <path d="${pathD}" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`:''}
+        ${dots}
+      </svg>
+    </div>
+    <p class="chart-axis-label">Sommeil moyen de l\'équipe sur 7 jours</p>`;
+}
+
+function renderChartTeamOverview(){
+  const el = document.getElementById('chart-team-overview');
+  const players = getPlayers();
+  const resp = getResponses();
+  const mResps = resp.filter(r=>r.date===dashDate&&r.type==='morning');
+  const tResps = resp.filter(r=>r.date===dashDate&&r.type==='training');
+
+  if(!mResps.length && !tResps.length){
+    el.innerHTML='<p class="text-muted" style="font-size:.82rem">Aucune donnée pour cette date.</p>';
+    return;
+  }
+
+  // Par joueuse : sommeil, fatigue, humeur, RPE, note séance
+  const metrics = [
+    {id:'q_sleep', label:'Sommeil', icon:'😴', source:'morning'},
+    {id:'q_fatigue', label:'Fatigue', icon:'⚡', source:'morning'},
+    {id:'q_mood', label:'Humeur', icon:'😊', source:'morning'},
+    {id:'q_rpe', label:'RPE', icon:'💪', source:'training'},
+    {id:'q_session_score', label:'Note Séance', icon:'⭐', source:'training'},
+  ];
+
+  const playerData = players.map(p=>{
+    const mr = mResps.find(r=>r.playerId===p.id);
+    const tr = tResps.find(r=>r.playerId===p.id);
+    const vals = metrics.map(m=>{
+      const src = m.source==='morning'?mr:tr;
+      const v = src?.answers?.[m.id];
+      return typeof v==='number'?v:null;
+    });
+    return {name:firstName(p.name), vals, hasData:vals.some(v=>v!==null)};
+  }).filter(d=>d.hasData);
+
+  if(!playerData.length){
+    el.innerHTML='<p class="text-muted" style="font-size:.82rem">Aucune donnée pour cette date.</p>';
+    return;
+  }
+
+  // Horizontal grouped bar chart per metric
+  const barColors = ['#6366f1','#ec4899','#14b8a6','#f59e0b','#8b5cf6','#ef4444','#10b981','#f97316','#3b82f6','#84cc16'];
+
+  el.innerHTML = `
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:6px 8px;font-size:.7rem;color:var(--muted);width:70px">Joueuse</th>
+            ${metrics.map(m=>`<th style="text-align:center;padding:6px 4px;font-size:.68rem;color:var(--muted)">${m.icon}<br>${m.label}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${playerData.map((p,pi)=>`
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:8px;font-weight:700;font-size:.8rem">${escHtml(p.name)}</td>
+              ${p.vals.map(v=>{
+                if(v===null) return '<td style="text-align:center;color:var(--muted)">—</td>';
+                const pct = (v/10)*100;
+                const col = valColor(v);
+                return `<td style="padding:6px 4px">
+                  <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+                    <div style="width:100%;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+                      <div style="width:${pct}%;height:100%;background:${col};border-radius:4px;transition:.3s"></div>
+                    </div>
+                    <span style="font-size:.72rem;font-weight:800;color:${col}">${v}</span>
+                  </div>
+                </td>`;
+              }).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+/* ==========================================================
+   JOUEUSES TAB (individual reports)
+   ========================================================== */
+function renderJoueusesTab(){
+  const players  = getPlayers();
+  const responses= getResponses();
+  const c = document.getElementById('joueuses-list');
+  if(!players.length){c.innerHTML='<p class="text-muted">Aucune joueuse.</p>';return;}
+  c.innerHTML = players.map(p=>{
+    const pResps = responses.filter(r=>r.playerId===p.id);
+    const last   = pResps.sort((a,b)=>b.date.localeCompare(a.date))[0];
+    return `
+    <div class="player-item" onclick="showPlayerReport('${p.id}')">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="player-avatar">${p.name.charAt(0).toUpperCase()}</div>
+        <div>
+          <div class="bold">${escHtml(p.name)}</div>
+          <div class="text-muted" style="font-size:.75rem">${pResps.length} réponses · dernière : ${last?new Date(last.date+'T12:00:00').toLocaleDateString('fr-FR'):'—'}</div>
+        </div>
+      </div>
+      <span style="color:var(--muted);font-size:1.2rem">›</span>
+    </div>`;
+  }).join('');
+}
+function showPlayerReport(pid){
+  window._reportPlayerId = pid;
+  const player = getPlayers().find(p=>p.id===pid);
+  if(!player) return;
+  document.getElementById('pr-name').textContent = player.name;
+  const responses = getResponses().filter(r=>r.playerId===pid).sort((a,b)=>b.date.localeCompare(a.date));
+  const last7 = getLast7Days();
+  const mR7  = responses.filter(r=>r.type==='morning'&&last7.includes(r.date));
+  const tR7  = responses.filter(r=>r.type==='training'&&last7.includes(r.date));
+  const avgRPE7   = avg(tR7,'q_rpe');
+  const avgSleep7 = avg(mR7,'q_sleep');
+  const avgMotiv7 = avg(mR7,'q_motivation');
+  const avgScore7 = avg(tR7,'q_session_score');
+
+  // training days config summary
+  const dayL={lundi:'Lun',mardi:'Mar',mercredi:'Mer',jeudi:'Jeu',vendredi:'Ven',samedi:'Sam',dimanche:'Dim'};
+  const tDays = Object.entries(player.trainingDays||{}).filter(([,v])=>v.active)
+    .map(([d,cfg])=>`<span class="badge ${cfg.type==='physique'?'badge-blue':'badge-green'}">${dayL[d]} ${cfg.type==='physique'?'🏋️':'🏐'} ${cfg.endTime}</span>`)
+    .join(' ');
+
+  // recent history rows
+  const recentRows = responses.slice(0,20).map(r=>{
+    const typ = r.type==='morning'?'🌅 Matin':(r.sessionType==='physique'?'🏋️ Physique':'🏐 Volley');
+    const main = r.type==='morning'
+      ?`😴 ${r.answers.q_sleep||'—'} ⚡ ${r.answers.q_fatigue||'—'}`
+      :`RPE <span class="rpe-${r.answers.q_rpe}">${r.answers.q_rpe||'—'}</span> Note <span class="rpe-${r.answers.q_session_score}">${r.answers.q_session_score||'—'}</span>`;
+    const flags=[];
+    if(r.answers.q_pain===true)   flags.push('🤕');
+    if(r.answers.q_period>=7)     flags.push(`🩸${r.answers.q_period}`);
+    if(r.answers.q_fatigue<=3)    flags.push(`⚡${r.answers.q_fatigue}`);
+    if(r.answers.q_rpe>=9)        flags.push(`🔥${r.answers.q_rpe}`);
+    const cmt = r.comment?`<br><em style="font-size:.72rem;color:var(--muted)">"${escHtml(r.comment)}"</em>`:'';
+    return `<tr>
+      <td>${new Date(r.date+'T12:00:00').toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit'})}</td>
+      <td>${typ}</td>
+      <td style="font-size:.8rem">${main}${cmt}</td>
+      <td>${flags.join(' ')||'✅'}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('pr-content').innerHTML=`
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-value rpe-${Math.round(avgRPE7)||0}">${avgRPE7||'—'}</div><div class="stat-label">RPE moy. 7j</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--secondary)">${avgSleep7||'—'}</div><div class="stat-label">Sommeil moy. 7j</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--success)">${avgScore7||'—'}</div><div class="stat-label">Note séance 7j</div></div>
+      <div class="stat-card"><div class="stat-value">${responses.length}</div><div class="stat-label">Total réponses</div></div>
+    </div>
+    <div class="card">
+      <h3 class="mb-8">⚖️ Ratio de Charge (ACWR)</h3>
+      <p class="text-muted" style="font-size:.78rem;margin-bottom:6px">Charge aiguë (7j) / Charge chronique (28j) — Zone optimale : 0.80 – 1.30</p>
+      ${renderACWRGauge(calcACWR(responses.filter(r=>r.type==='training')))}
+    </div>
+    <div class="card">
+      <h3 class="mb-8">📅 Planning entraînement</h3>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${tDays||'<span class="text-muted">Non configuré</span>'}</div>
+    </div>
+    <div class="card">
+      <h3 class="mb-8">📈 RPE — 7 derniers jours</h3>
+      ${renderMiniChart(tR7,last7,'q_rpe')}
+    </div>
+    <div class="card">
+      <h3 class="mb-8">📈 Sommeil — 7 derniers jours</h3>
+      ${renderMiniChart(mR7,last7,'q_sleep')}
+    </div>
+    <div class="card">
+      <h3 class="mb-12">📋 Historique récent</h3>
+      <div style="overflow-x:auto">
+        <table class="report-table">
+          <thead><tr><th>Date</th><th>Type</th><th>Données</th><th>Alertes</th></tr></thead>
+          <tbody>${recentRows||'<tr><td colspan="4" class="text-muted">Aucune donnée.</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+  showScreen('player-report');
+}
+
+// === EXPORT PDF RAPPORT INDIVIDUEL ===
+function exportPlayerPDF(){
+  const pid = window._reportPlayerId;
+  if(!pid){alert('Aucune joueuse sélectionnée.');return;}
+  const player = getPlayers().find(p=>p.id===pid);
+  if(!player) return;
+
+  // Ouvre une nouvelle fenêtre avec le rapport formaté pour impression/PDF
+  const content = document.getElementById('pr-content').innerHTML;
+  const name = escHtml(player.name);
+  const date = new Date().toLocaleDateString('fr-FR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Rapport ${name}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#fff;color:#1e293b;padding:20px;font-size:11pt;max-width:800px;margin:0 auto}
+.header-print{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #1a56db;padding-bottom:12px;margin-bottom:20px}
+.header-print h1{font-size:1.4rem;color:#1a56db}
+.header-print .date{font-size:.85rem;color:#64748b}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:12px;page-break-inside:avoid}
+.card h3{font-size:.95rem;font-weight:700;margin-bottom:8px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.stat-card{background:#f0f4ff;border-radius:10px;padding:12px;text-align:center}
+.stat-value{font-size:1.3rem;font-weight:900}
+.stat-label{font-size:.7rem;color:#64748b;margin-top:2px}
+.badge{display:inline-block;padding:3px 8px;border-radius:6px;font-size:.72rem;font-weight:600}
+.badge-green{background:#d1fae5;color:#065f46}
+.badge-blue{background:#dbeafe;color:#1e40af}
+.badge-yellow{background:#fef3c7;color:#92400e}
+.badge-red{background:#fee2e2;color:#991b1b}
+.bold{font-weight:700}
+.text-muted{color:#64748b;font-size:.85rem}
+.report-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.report-table th,.report-table td{padding:6px 8px;border-bottom:1px solid #e2e8f0;text-align:left}
+.report-table th{background:#f0f4ff;font-size:.72rem;color:#64748b;text-transform:uppercase}
+.mini-chart-wrap{display:flex;gap:5px;align-items:flex-end;height:60px;padding:4px 0}
+.mini-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.mini-bar{width:100%;border-radius:4px 4px 0 0;min-height:3px}
+.mini-label{font-size:.55rem;color:#64748b}
+.mini-val{font-size:.6rem;font-weight:800}
+.rpe-0{color:#94a3b8}.rpe-1,.rpe-2{color:#ef4444}.rpe-3,.rpe-4{color:#f97316}.rpe-5,.rpe-6{color:#f59e0b}.rpe-7,.rpe-8{color:#84cc16}.rpe-9,.rpe-10{color:#10b981}
+@media print{body{padding:10px}.card{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="header-print">
+  <div>
+    <h1>🏐 ${name}</h1>
+    <p class="text-muted">Rapport individuel — Équipe ${escHtml(player.equipe||'A')}</p>
+  </div>
+  <div class="date">${date}</div>
+</div>
+${content}
+<script>window.onload=function(){window.print();}<\\/script>
+</body>
+</html>`;
+
+  const w = window.open('','_blank');
+  if(w){
+    w.document.write(html);
+    w.document.close();
+  } else {
+    alert('Le navigateur a bloqué la fenêtre popup. Autorisez les popups pour ce site.');
+  }
+}
+// === FIN EXPORT PDF ===
+
+function renderMiniChart(resps, days7, field){
+  const dayLetters=['D','L','Ma','Me','J','V','S'];
+  const colors=['#94a3b8','#ef4444','#ef4444','#f97316','#f97316','#f59e0b','#f59e0b','#84cc16','#84cc16','#10b981','#10b981'];
+  if(!resps.length) return '<p class="text-muted" style="font-size:.82rem">Pas de donnée cette semaine.</p>';
+  const bars = days7.map(date=>{
+    const r = resps.find(x=>x.date===date);
+    const v = r?r.answers[field]:null;
+    const h = v!==null&&v!==undefined?(v/10*55)+5:0;
+    const col = v!==null?colors[v]:'#e2e8f0';
+    const dIdx = new Date(date+'T12:00:00').getDay();
+    return `<div class="mini-bar-col">
+      ${v!==null?`<span class="mini-val" style="color:${col}">${v}</span>`:'<span class="mini-val"> </span>'}
+      <div class="mini-bar" style="height:${h}px;background:${col}"></div>
+      <span class="mini-label">${dayLetters[dIdx]}</span>
+    </div>`;
+  }).join('');
+  return `<div class="mini-chart-wrap">${bars}</div>`;
+}
+
+/* ==========================================================
+   CONFIG TAB
+   ========================================================== */
+function renderConfigTab(){
+  renderQEditor('morning');
+  renderQEditor('training');
+  renderPlayersConfig();
+  loadNotifSettingsUI();
+  loadAlertThresholdsUI();
+  // Day toggle listeners
+  document.querySelectorAll('#new-days .toggle-day').forEach(btn=>{
+    btn.onclick=function(){this.classList.toggle('active');renderDaysDetail();};
+  });
+}
+
+/* ---- Question Editor ---- */
+function renderQEditor(type){
+  const qcfg = getQConfig();
+  const qs   = qcfg[type];
+  const cid  = type+'-q-editor';
+  const typeLabels = {borg:'Borg 1-10',borg0:'Borg 0-10',yn:'Oui/Non',text:'Texte libre'};
+  const typeColors = {borg:'chip-borg',borg0:'chip-borg0',yn:'chip-yn',text:'chip-text'};
+  document.getElementById(cid).innerHTML = qs.map((q,i)=>`
+    <div class="q-editor-item">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <span class="bold" style="font-size:.9rem">${i+1}. ${q.label.substring(0,40)}${q.label.length>40?'…':''}</span>
+          <span class="q-type-chip ${typeColors[q.type]||'chip-borg'}">${typeLabels[q.type]||q.type}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:.8rem">
+            <input type="checkbox" ${q.active?'checked':''} onchange="toggleQuestion('${type}',${i})"> Actif
+          </label>
+          <button class="btn btn-sm" style="background:#fee2e2;color:#991b1b;border:none;padding:6px 10px" onclick="deleteQuestion('${type}',${i})">✕</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="form-input" style="flex:2;min-width:140px;padding:7px 10px;font-size:.82rem" value="${escHtml(q.label)}" onchange="updateQuestion('${type}',${i},'label',this.value)" placeholder="Texte de la question">
+        <select class="form-select" style="flex:1;min-width:110px;padding:7px;font-size:.82rem" onchange="updateQuestion('${type}',${i},'type',this.value)">
+          <option value="borg"  ${q.type==='borg' ?'selected':''}>Borg 1-10</option>
+          <option value="borg0" ${q.type==='borg0'?'selected':''}>Borg 0-10</option>
+          <option value="yn"    ${q.type==='yn'   ?'selected':''}>Oui/Non</option>
+        </select>
+      </div>
+      <input class="form-input mt-8" style="padding:6px 10px;font-size:.78rem;color:var(--muted)" value="${escHtml(q.hint||'')}" onchange="updateQuestion('${type}',${i},'hint',this.value)" placeholder="Aide (optionnel)">
+    </div>`).join('') +
+    `<div class="q-editor-item" style="background:#f0fdf4;border-color:#a7f3d0">
+      <span class="bold" style="font-size:.9rem">💬 Commentaire libre</span>
+      <span class="q-type-chip chip-text">Texte</span>
+      <p class="text-muted mt-8" style="font-size:.78rem">Toujours présent en fin de questionnaire, non modifiable.</p>
+    </div>`;
+}
+function toggleQuestion(type,idx){
+  const cfg = getQConfig();
+  cfg[type][idx].active = !cfg[type][idx].active;
+  DB.set('qconfig',cfg);
+  renderQEditor(type);
+}
+function updateQuestion(type,idx,field,val){
+  const cfg = getQConfig();
+  cfg[type][idx][field] = val;
+  DB.set('qconfig',cfg);
+}
+function deleteQuestion(type,idx){
+  if(!confirm('Supprimer cette question ?')) return;
+  const cfg = getQConfig();
+  cfg[type].splice(idx,1);
+  DB.set('qconfig',cfg);
+  renderQEditor(type);
+}
+function addQuestion(type){
+  const cfg = getQConfig();
+  cfg[type].push({id:'q_custom_'+Date.now(),active:true,label:'Nouvelle question',type:'borg',hint:''});
+  DB.set('qconfig',cfg);
+  renderQEditor(type);
+}
+
+/* ---- Players Config ---- */
+function makeSessId(){ return 's'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+function renderDaysDetail(){
+  const activeDays = Array.from(document.querySelectorAll('#new-days .toggle-day.active')).map(b=>b.dataset.day);
+  const labels={lundi:'Lundi',mardi:'Mardi',mercredi:'Mercredi',jeudi:'Jeudi',vendredi:'Vendredi',samedi:'Samedi',dimanche:'Dimanche'};
+  if(!window._newSessions) window._newSessions={};
+  activeDays.forEach(d=>{ if(!window._newSessions[d]) window._newSessions[d]=[{id:makeSessId(),type:'volley',endTime:'20:00',label:'Séance 1'}]; });
+  Object.keys(window._newSessions).forEach(d=>{ if(!activeDays.includes(d)) delete window._newSessions[d]; });
+  document.getElementById('days-detail').innerHTML = activeDays.map(day=>`
+    <div class="card" style="padding:12px;margin-top:8px" id="daycard-${day}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="bold" style="font-size:.85rem">${labels[day]}</div>
+        <button class="btn btn-sm btn-ghost" style="padding:5px 10px;font-size:.78rem" onclick="addSession('${day}')">+ Séance</button>
+      </div>
+      <div id="sessions-${day}">${renderSessionsForm(day)}</div>
+    </div>`).join('');
+}
+function renderSessionsForm(day){
+  const sessions = window._newSessions[day]||[];
+  return sessions.map((s,i)=>`
+    <div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:8px;background:var(--bg);border-radius:8px;padding:8px;flex-wrap:wrap">
+      <div style="flex:1.4;min-width:90px">
+        <label class="form-label" style="font-size:.72rem">Nom séance</label>
+        <input class="form-input" style="padding:6px 8px;font-size:.82rem" value="${escHtml(s.label)}" oninput="updateSession('${day}','${s.id}','label',this.value)" placeholder="Ex: Volley soir">
+      </div>
+      <div style="flex:1;min-width:80px">
+        <label class="form-label" style="font-size:.72rem">Type</label>
+        <select class="form-select" style="padding:6px 8px;font-size:.82rem" onchange="updateSession('${day}','${s.id}','type',this.value)">
+          <option value="volley" ${s.type==='volley'?'selected':''}>🏐 Volley</option>
+          <option value="physique" ${s.type==='physique'?'selected':''}>🏋️ Physique</option>
+        </select>
+      </div>
+      <div style="flex:.7;min-width:60px">
+        <label class="form-label" style="font-size:.72rem">Durée (min)</label>
+        <input type="number" class="form-input" style="padding:6px 8px;font-size:.82rem" value="${s.duration||90}" min="10" max="300" oninput="updateSession('${day}','${s.id}','duration',parseInt(this.value)||90)">
+      </div>
+      <div style="flex:.8;min-width:70px">
+        <label class="form-label" style="font-size:.72rem">Fin</label>
+        <input type="time" class="form-input" style="padding:6px 8px;font-size:.82rem" value="${s.endTime}" oninput="updateSession('${day}','${s.id}','endTime',this.value)">
+      </div>
+      ${sessions.length>1?`<button onclick="removeSession('${day}','${s.id}')" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-size:.85rem;cursor:pointer;flex-shrink:0">✕</button>`:''}
+    </div>`).join('');
+}
+function addSession(day){
+  if(!window._newSessions) window._newSessions={};
+  if(!window._newSessions[day]) window._newSessions[day]=[];
+  const n = window._newSessions[day].length+1;
+  window._newSessions[day].push({id:makeSessId(),type:'volley',endTime:'20:00',label:'Séance '+n});
+  document.getElementById('sessions-'+day).innerHTML=renderSessionsForm(day);
+}
+function removeSession(day,sid){
+  window._newSessions[day]=window._newSessions[day].filter(s=>s.id!==sid);
+  document.getElementById('sessions-'+day).innerHTML=renderSessionsForm(day);
+}
+function updateSession(day,sid,field,val){
+  const s=window._newSessions[day]?.find(x=>x.id===sid);
+  if(s) s[field]=val;
+}
+function addPlayer(){
+  const name = document.getElementById('new-name').value.trim();
+  if(!name){alert('Entrez un nom.');return;}
+  const morningTime = document.getElementById('new-morning').value||'08:00';
+  const activeDays  = Array.from(document.querySelectorAll('#new-days .toggle-day.active')).map(b=>b.dataset.day);
+  const allDays     = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
+  const trainingDays= {};
+  allDays.forEach(d=>{
+    const active = activeDays.includes(d);
+    if(active && window._newSessions && window._newSessions[d]){
+      // Utilise les sessions configurées dans le formulaire multi-séances
+      const sessions = window._newSessions[d];
+      const firstType = sessions[0]?.type||'volley';
+      const firstEnd  = sessions[0]?.endTime||'20:00';
+      trainingDays[d] = {active:true, type:firstType, endTime:firstEnd, sessions};
+    } else {
+      trainingDays[d] = {active:false, type:'volley', endTime:'20:00'};
+    }
+  });
+  const equipe = document.getElementById('new-equipe')?.value||'A';
+  const p = {id:Date.now().toString(),name,morningTime,trainingDays,equipe};
+  const players=[...getPlayers(),p];
+  DB.set('players',players);
+  document.getElementById('new-name').value='';
+  document.querySelectorAll('#new-days .toggle-day').forEach(b=>b.classList.remove('active'));
+  document.getElementById('days-detail').innerHTML='';
+  window._newSessions = {};
+  renderPlayersConfig();
+  alert(`✅ ${name} ajoutée !`);
+}
+function renderPlayersConfig(){
+  const players = getPlayers();
+  const dayL={lundi:'L',mardi:'Ma',mercredi:'Me',jeudi:'J',vendredi:'V',samedi:'S',dimanche:'D'};
+  const c = document.getElementById('players-list-config');
+  if(!players.length){c.innerHTML='<p class="text-muted" style="font-size:.85rem">Aucune joueuse.</p>';return;}
+  c.innerHTML = players.map(p=>{
+    const chips = Object.entries(p.trainingDays||{}).filter(([,v])=>v.active)
+      .map(([d,cfg])=>`<span class="badge ${cfg.type==='physique'?'badge-blue':'badge-green'}">${dayL[d]}</span>`).join(' ');
+    const notifOn = p.notifEnabled !== false;
+    const notifIcon = notifOn ? '🔔' : '🔕';
+    const notifStyle = notifOn
+      ? 'background:#d1fae5;color:#065f46'
+      : 'background:#f1f5f9;color:#94a3b8';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)">
+      <div>
+        <div class="bold" style="font-size:.9rem">${escHtml(p.name)} <span class="badge badge-blue" style="font-size:.7rem">Équipe ${escHtml(p.equipe||'A')}</span></div>
+        <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+          ${chips||'<span class="text-muted" style="font-size:.75rem">Pas d\'entraînement configuré</span>'}
+          <span style="font-size:.68rem;${notifOn?'color:#065f46':'color:#94a3b8'};margin-left:4px">${notifIcon} ${notifOn?'Notifs ON':'Notifs OFF'}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="togglePlayerNotif('${p.id}')" style="${notifStyle};border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem" title="${notifOn?'Désactiver les notifications':'Activer les notifications'}">${notifIcon}</button>
+        <button onclick="editPlayer('${p.id}')" style="background:#dbeafe;color:#1e40af;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem">✏️</button>
+        <button onclick="deletePlayer('${p.id}')" style="background:#fee2e2;color:#991b1b;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function deletePlayer(pid){
+  if(!confirm('Supprimer cette joueuse ? Ses données seront conservées.')) return;
+  DB.set('players',getPlayers().filter(p=>p.id!==pid));
+  renderPlayersConfig();
+}
+
+// === GESTION NOTIFICATIONS JOUEUSE ===
+function togglePlayerNotif(pid){
+  const players = getPlayers();
+  const p = players.find(x=>x.id===pid);
+  if(!p) return;
+  const wasOn = p.notifEnabled !== false;
+  p.notifEnabled = !wasOn;
+
+  // Si on désactive : supprimer la subscription push côté serveur (quand backend disponible)
+  if(wasOn && p.pushSubscription){
+    unsubscribePlayerPush(p);
+  }
+
+  DB.set('players', players);
+  renderPlayersConfig();
+
+  const status = p.notifEnabled ? '🔔 Notifications activées' : '🔕 Notifications désactivées';
+  alert(`${status} pour ${p.name}`);
+}
+
+// Placeholder pour l'appel serveur — à connecter quand le backend Firebase sera en place
+function unsubscribePlayerPush(player){
+  // TODO: Quand le backend est en place, appeler :
+  // fetch('https://ton-serveur.com/api/unsubscribe', {
+  //   method: 'POST',
+  //   headers: {'Content-Type':'application/json'},
+  //   body: JSON.stringify({ playerId: player.id, subscription: player.pushSubscription })
+  // });
+  console.log('[Push] Désabonnement prévu pour', player.name, '— en attente du backend');
+  player.pushSubscription = null;
+}
+// === FIN GESTION NOTIFICATIONS ===
+
+/* ---- Edit Player ---- */
+let _editPlayerId = null;
+function editPlayer(pid){
+  const player = getPlayers().find(p=>p.id===pid);
+  if(!player) return;
+  _editPlayerId = pid;
+  document.getElementById('edit-name').value = player.name;
+  document.getElementById('edit-equipe').value = player.equipe||'A';
+  document.getElementById('edit-morning').value = player.morningTime||'08:00';
+  // Initialise les sessions d'édition
+  window._editSessions = {};
+  const allDays = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
+  document.querySelectorAll('#edit-days .toggle-day').forEach(btn=>{
+    const d = btn.dataset.day;
+    const cfg = player.trainingDays?.[d];
+    if(cfg?.active){
+      btn.classList.add('active');
+      window._editSessions[d] = cfg.sessions || [{id:makeSessId(),type:cfg.type||'volley',endTime:cfg.endTime||'20:00',label:'Séance 1'}];
+    } else {
+      btn.classList.remove('active');
+    }
+    btn.onclick = function(){ this.classList.toggle('active'); renderEditDaysDetail(); };
+  });
+  renderEditDaysDetail();
+  // === Initialise le toggle notifications ===
+  window._editNotifEnabled = player.notifEnabled !== false;
+  updateEditNotifUI();
+  showScreen('edit-player');
+}
+function updateEditNotifUI(){
+  const btn = document.getElementById('edit-notif-toggle');
+  const label = document.getElementById('edit-notif-label');
+  if(window._editNotifEnabled){
+    btn.textContent = '🔔 Activées';
+    btn.style.background = '#d1fae5';
+    btn.style.color = '#065f46';
+    btn.style.border = '1px solid #a7f3d0';
+    label.textContent = 'La joueuse recevra les rappels push.';
+  } else {
+    btn.textContent = '🔕 Désactivées';
+    btn.style.background = '#f1f5f9';
+    btn.style.color = '#94a3b8';
+    btn.style.border = '1px solid var(--border)';
+    label.textContent = 'Aucun rappel ne sera envoyé.';
+  }
+}
+function toggleEditNotif(){
+  window._editNotifEnabled = !window._editNotifEnabled;
+  updateEditNotifUI();
+}
+function renderEditDaysDetail(){
+  const activeDays = Array.from(document.querySelectorAll('#edit-days .toggle-day.active')).map(b=>b.dataset.day);
+  const labels={lundi:'Lundi',mardi:'Mardi',mercredi:'Mercredi',jeudi:'Jeudi',vendredi:'Vendredi',samedi:'Samedi',dimanche:'Dimanche'};
+  if(!window._editSessions) window._editSessions={};
+  activeDays.forEach(d=>{ if(!window._editSessions[d]) window._editSessions[d]=[{id:makeSessId(),type:'volley',endTime:'20:00',label:'Séance 1'}]; });
+  Object.keys(window._editSessions).forEach(d=>{ if(!activeDays.includes(d)) delete window._editSessions[d]; });
+  document.getElementById('edit-days-detail').innerHTML = activeDays.map(day=>`
+    <div class="card" style="padding:12px;margin-top:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="bold" style="font-size:.85rem">${labels[day]}</div>
+        <button class="btn btn-sm btn-ghost" style="padding:5px 10px;font-size:.78rem" onclick="addEditSession('${day}')">+ Séance</button>
+      </div>
+      <div id="edit-sessions-${day}">${renderEditSessionsForm(day)}</div>
+    </div>`).join('');
+}
+function renderEditSessionsForm(day){
+  const sessions = window._editSessions[day]||[];
+  return sessions.map((s,i)=>`
+    <div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:8px;background:var(--bg);border-radius:8px;padding:8px;flex-wrap:wrap">
+      <div style="flex:1.4;min-width:90px">
+        <label class="form-label" style="font-size:.72rem">Nom séance</label>
+        <input class="form-input" style="padding:6px 8px;font-size:.82rem" value="${escHtml(s.label)}" oninput="updateEditSession('${day}','${s.id}','label',this.value)">
+      </div>
+      <div style="flex:1;min-width:80px">
+        <label class="form-label" style="font-size:.72rem">Type</label>
+        <select class="form-select" style="padding:6px 8px;font-size:.82rem" onchange="updateEditSession('${day}','${s.id}','type',this.value)">
+          <option value="volley" ${s.type==='volley'?'selected':''}>🏐 Volley</option>
+          <option value="physique" ${s.type==='physique'?'selected':''}>🏋️ Physique</option>
+        </select>
+      </div>
+      <div style="flex:.7;min-width:60px">
+        <label class="form-label" style="font-size:.72rem">Durée (min)</label>
+        <input type="number" class="form-input" style="padding:6px 8px;font-size:.82rem" value="${s.duration||90}" min="10" max="300" oninput="updateEditSession('${day}','${s.id}','duration',parseInt(this.value)||90)">
+      </div>
+      <div style="flex:.8;min-width:70px">
+        <label class="form-label" style="font-size:.72rem">Fin</label>
+        <input type="time" class="form-input" style="padding:6px 8px;font-size:.82rem" value="${s.endTime}" oninput="updateEditSession('${day}','${s.id}','endTime',this.value)">
+      </div>
+      ${sessions.length>1?`<button onclick="removeEditSession('${day}','${s.id}')" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-size:.85rem;cursor:pointer;flex-shrink:0">✕</button>`:''}
+    </div>`).join('');
+}
+function addEditSession(day){
+  if(!window._editSessions[day]) window._editSessions[day]=[];
+  const n = window._editSessions[day].length+1;
+  window._editSessions[day].push({id:makeSessId(),type:'volley',endTime:'20:00',label:'Séance '+n});
+  document.getElementById('edit-sessions-'+day).innerHTML=renderEditSessionsForm(day);
+}
+function removeEditSession(day,sid){
+  window._editSessions[day]=window._editSessions[day].filter(s=>s.id!==sid);
+  document.getElementById('edit-sessions-'+day).innerHTML=renderEditSessionsForm(day);
+}
+function updateEditSession(day,sid,field,val){
+  const s=window._editSessions[day]?.find(x=>x.id===sid);
+  if(s) s[field]=val;
+}
+function saveEditPlayer(){
+  const name = document.getElementById('edit-name').value.trim();
+  if(!name){alert('Entrez un nom.');return;}
+  const players = getPlayers();
+  const idx = players.findIndex(p=>p.id===_editPlayerId);
+  if(idx===-1){alert('Joueuse introuvable.');return;}
+  players[idx].name = name;
+  players[idx].equipe = document.getElementById('edit-equipe').value||'A';
+  players[idx].morningTime = document.getElementById('edit-morning').value||'08:00';
+  const allDays = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
+  const activeDays = Array.from(document.querySelectorAll('#edit-days .toggle-day.active')).map(b=>b.dataset.day);
+  const trainingDays = {};
+  allDays.forEach(d=>{
+    const active = activeDays.includes(d);
+    if(active && window._editSessions && window._editSessions[d]){
+      const sessions = window._editSessions[d];
+      trainingDays[d] = {active:true, type:sessions[0]?.type||'volley', endTime:sessions[0]?.endTime||'20:00', sessions};
+    } else {
+      trainingDays[d] = {active:false, type:'volley', endTime:'20:00'};
+    }
+  });
+  players[idx].trainingDays = trainingDays;
+  // === Sauvegarde état notifications ===
+  const wasNotifOn = players[idx].notifEnabled !== false;
+  players[idx].notifEnabled = window._editNotifEnabled;
+  // Si désactivé → déclencher le désabonnement push
+  if(wasNotifOn && !window._editNotifEnabled && players[idx].pushSubscription){
+    unsubscribePlayerPush(players[idx]);
+  }
+  // Met à jour aussi le nom dans les réponses existantes
+  const resp = getResponses();
+  resp.forEach(r=>{ if(r.playerId===_editPlayerId) r.playerName=name; });
+  DB.set('responses', resp);
+  DB.set('players', players);
+  window._editSessions = {};
+  alert(`✅ ${name} modifiée !`);
+  showScreen('dashboard');
+  switchTab('config');
+}
+async function changePin(){
+  const v=document.getElementById('new-pin').value;
+  if(!/^\d{4}$/.test(v)){alert('Le PIN doit comporter 4 chiffres.');return;}
+  const hashed = await hashPin(v);
+  const s=getSettings();
+  s.pinHash=hashed;
+  delete s.pin; // supprime l'ancien PIN en clair
+  DB.set('settings',s);
+  document.getElementById('new-pin').value='';
+  alert('✅ PIN modifié et sécurisé !');
+}
+
+/* ==========================================================
+   EXPORT CSV
+   ========================================================== */
+function exportCSV(){
+  let resp = getResponses();
+  if(!resp.length){alert('Aucune donnée à exporter.');return;}
+  // Filtres
+  const fromDate = document.getElementById('export-from')?.value||'';
+  const toDate   = document.getElementById('export-to')?.value||'';
+  const equipe   = document.getElementById('export-equipe')?.value||'all';
+  if(fromDate) resp = resp.filter(r=>r.date>=fromDate);
+  if(toDate)   resp = resp.filter(r=>r.date<=toDate);
+  if(equipe!=='all'){
+    const playerIds = new Set(getPlayers().filter(p=>(p.equipe||'A')===equipe).map(p=>p.id));
+    resp = resp.filter(r=>playerIds.has(r.playerId));
+  }
+  if(!resp.length){alert('Aucune donnée ne correspond aux filtres sélectionnés.');return;}
+  const qcfg = getQConfig();
+  const allIds = [...new Set([...qcfg.morning,...qcfg.training].map(q=>q.id))];
+  const headers = ['Date','Joueuse','Équipe','Type','TypeSéance',...allIds,'Commentaire'];
+  const playersMap = Object.fromEntries(getPlayers().map(p=>[p.id,p]));
+  const rows = resp.map(r=>{
+    const pl = playersMap[r.playerId];
+    return [r.date,r.playerName,pl?.equipe||'?',r.type,r.sessionType||'',...allIds.map(id=>{
+      const v=r.answers[id];
+      if(v===undefined) return '';
+      if(typeof v==='boolean') return v?'Oui':'Non';
+      return v;
+    }),r.comment||''];
+  });
+  const csv=[headers,...rows].map(row=>row.join(';')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const suffix = (fromDate||toDate)?`${fromDate||'debut'}_${toDate||'fin'}`:todayKey();
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`rpe-suivi-${suffix}.csv`;a.click();
+}
+
+/* ==========================================================
+   NOTIFICATIONS
+   ========================================================== */
+// === RÉGLAGES NOTIFICATIONS ===
+function getNotifSettings(){
+  return DB.get('notifSettings', {postDelay:15, repeatInterval:10, stopAfterHours:2});
+}
+function saveNotifSettings(){
+  const postDelay = parseInt(document.getElementById('notif-post-delay')?.value)||15;
+  const repeatInterval = Math.max(5, parseInt(document.getElementById('notif-repeat-interval')?.value)||10);
+  const stopAfterHours = Math.max(1, parseInt(document.getElementById('notif-stop-after')?.value)||2);
+  DB.set('notifSettings', {postDelay, repeatInterval, stopAfterHours});
+  alert('✅ Réglages notifications enregistrés !');
+}
+function loadNotifSettingsUI(){
+  const s = getNotifSettings();
+  const el1 = document.getElementById('notif-post-delay');
+  const el2 = document.getElementById('notif-repeat-interval');
+  const el3 = document.getElementById('notif-stop-after');
+  if(el1) el1.value = s.postDelay;
+  if(el2) el2.value = s.repeatInterval;
+  if(el3) el3.value = s.stopAfterHours;
+}
+// === FIN RÉGLAGES NOTIFICATIONS ===
+
+async function requestNotifPermission(){
+  if(!('Notification' in window)) return false;
+  // Enregistre le SW d'abord pour que les notifs fonctionnent sur mobile
+  if('serviceWorker' in navigator){
+    try { await navigator.serviceWorker.register('sw.js'); } catch(e){}
+  }
+  if(Notification.permission==='granted') return true;
+  if(Notification.permission!=='denied'){
+    const p=await Notification.requestPermission();
+    return p==='granted';
+  }
+  return false;
+}
+function scheduleNotifications(){
+  const players=getPlayers();
+  const today=todayKey();
+  const resp=getResponses();
+  const days7=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const todayN=days7[new Date().getDay()];
+  const notifCfg=getNotifSettings();
+  players.forEach(p=>{
+    // Respecte le flag notifEnabled par joueuse
+    if(p.notifEnabled===false) return;
+    if(!resp.some(r=>r.playerId===p.id&&r.date===today&&r.type==='morning')){
+      const [h,m]=(p.morningTime||'08:00').split(':').map(Number);
+      scheduleReminder(p,'morning',h,m);
+    }
+    if(p.trainingDays?.[todayN]?.active){
+      const dayCfg=p.trainingDays[todayN];
+      const sessions=dayCfg.sessions||[{id:'s0',type:dayCfg.type||'volley',endTime:dayCfg.endTime||'20:00',label:'Séance'}];
+      sessions.forEach(s=>{
+        if(!resp.some(r=>r.playerId===p.id&&r.date===today&&r.type==='training'&&r.sessionId===s.id)){
+          const [h,m]=(s.endTime||'20:00').split(':').map(Number);
+          // Ajoute le délai post-séance configurable
+          const totalMin = h*60 + m + (notifCfg.postDelay||15);
+          const nh = Math.floor(totalMin/60) % 24;
+          const nm = totalMin % 60;
+          scheduleReminder(p,'training',nh,nm,s);
+        }
+      });
+    }
+  });
+}
+function scheduleReminder(player,type,hour,minute,session=null){
+  const now=new Date(),target=new Date();
+  target.setHours(hour,minute,0,0);
+  let delay=target-now;
+  const key=`${player.id}-${type}-${session?.id||'main'}`;
+  if(reminderTimers[key]) clearTimeout(reminderTimers[key]);
+  if(delay<=0){
+    if(delay>-2*3600000) startReminderLoop(player,type,session);
+    return;
+  }
+  reminderTimers[key]=setTimeout(()=>{sendNotif(player,type,session);startReminderLoop(player,type,session);},delay);
+}
+function startReminderLoop(player,type,session=null){
+  const lkey=`${player.id}-${type}-${session?.id||'main'}-loop`;
+  if(reminderTimers[lkey]) return;
+  const notifCfg=getNotifSettings();
+  const intervalMs=(notifCfg.repeatInterval||10)*60*1000;
+  const stopMs=(notifCfg.stopAfterHours||2)*3600*1000;
+  const startTime=Date.now();
+  reminderTimers[lkey]=setInterval(()=>{
+    // Arrêt automatique après X heures
+    if(Date.now()-startTime>stopMs){
+      clearInterval(reminderTimers[lkey]);delete reminderTimers[lkey];return;
+    }
+    const sid=session?.id||null;
+    const done=getResponses().some(r=>r.playerId===player.id&&r.date===todayKey()&&r.type===type&&r.sessionId===sid);
+    if(done){clearInterval(reminderTimers[lkey]);delete reminderTimers[lkey];return;}
+    sendNotif(player,type,session);
+  },intervalMs);
+}
+function cancelReminder(pid,type,session=null){
+  const lkey=`${pid}-${type}-${session?.id||'main'}-loop`;
+  if(reminderTimers[lkey]){clearInterval(reminderTimers[lkey]);delete reminderTimers[lkey];}
+}
+function sendNotif(player,type){
+  if(Notification.permission!=='granted') return;
+  const title=type==='morning'?`🌅 Bien-être – ${firstName(player.name)}`:`💪 Charge séance – ${firstName(player.name)}`;
+  const body =type==='morning'?'N\'oubliez pas votre questionnaire matinal !':'Évaluez votre séance d\'entraînement !';
+  // Utilise le Service Worker si disponible (mobile/PWA), sinon Notification directe
+  if('serviceWorker' in navigator && navigator.serviceWorker.controller){
+    navigator.serviceWorker.ready.then(reg=>{
+      reg.showNotification(title,{body,tag:`${player.id}-${type}`,requireInteraction:true,icon:'https://delacourtedf-cmyk.github.io/suivi-rpe/icon.png'});
+    });
+  } else {
+    new Notification(title,{body,tag:`${player.id}-${type}`});
+  }
+}
+function updateNotifStatus(){
+  const el=document.getElementById('notif-status-home');
+  if(!el) return;
+  if(!('Notification' in window)){el.textContent='⚠️ Notifications non supportées';return;}
+  el.textContent=Notification.permission==='granted'?'🔔 Notifications activées':'🔕 Notifications désactivées — cliquez pour activer';
+  el.style.cursor=Notification.permission!=='granted'?'pointer':'default';
+  el.onclick=Notification.permission!=='granted'?async()=>{await requestNotifPermission();updateNotifStatus();}:null;
+}
+
+/* ==========================================================
+   HELPERS
+   ========================================================== */
+function todayKey(){ return new Date().toISOString().split('T')[0]; }
+function firstName(name){ return (name||'').split(' ')[0]; }
+function getLast7Days(){
+  return Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);return d.toISOString().split('T')[0];});
+}
+function getLastNDays(n){
+  return Array.from({length:n},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(n-1)+i);return d.toISOString().split('T')[0];});
+}
+function avg(arr,field){
+  const vals=arr.map(r=>r.answers[field]).filter(v=>typeof v==='number');
+  if(!vals.length) return null;
+  return (vals.reduce((s,v)=>s+v,0)/vals.length).toFixed(1);
+}
+function calcACWR(trainingResponses){
+  // Charge aiguë = somme RPE 7 derniers jours
+  // Charge chronique = moyenne hebdomadaire RPE sur 28 jours
+  const days7  = getLastNDays(7);
+  const days28 = getLastNDays(28);
+  const acute  = trainingResponses.filter(r=>days7.includes(r.date))
+    .reduce((s,r)=>s+(r.answers.q_rpe||0),0);
+  const weeks = [0,1,2,3].map(w=>{
+    const wDays = Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-27+(w*7)+i);return d.toISOString().split('T')[0];});
+    return trainingResponses.filter(r=>wDays.includes(r.date)).reduce((s,r)=>s+(r.answers.q_rpe||0),0);
+  });
+  const chronic = weeks.reduce((s,v)=>s+v,0)/4;
+  if(chronic===0) return null;
+  return (acute/chronic).toFixed(2);
+}
+function acwrBadge(ratio){
+  if(ratio===null) return '<span class="badge badge-yellow">Données insuffisantes</span>';
+  const r = parseFloat(ratio);
+  if(r<0.8) return `<span class="badge badge-blue" style="font-size:.9rem;padding:5px 12px">${ratio}</span> <span class="text-muted" style="font-size:.78rem">Sous-entraînement</span>`;
+  if(r<=1.3) return `<span class="badge badge-green" style="font-size:.9rem;padding:5px 12px">${ratio}</span> <span class="text-muted" style="font-size:.78rem">Zone optimale ✓</span>`;
+  if(r<=1.5) return `<span class="badge badge-yellow" style="font-size:.9rem;padding:5px 12px">${ratio}</span> <span class="text-muted" style="font-size:.78rem">Attention — risque modéré</span>`;
+  return `<span class="badge badge-red" style="font-size:.9rem;padding:5px 12px">${ratio}</span> <span class="text-muted" style="font-size:.78rem">Danger — risque de blessure élevé</span>`;
+}
+function renderACWRGauge(ratio){
+  if(ratio===null) return '<p class="text-muted" style="font-size:.82rem">Pas assez de données (28 jours nécessaires).</p>';
+  const r = parseFloat(ratio);
+  // Barre graduée 0 → 2.0
+  const pct = Math.min(r/2*100,100);
+  const col = r<0.8?'#3b82f6':r<=1.3?'#10b981':r<=1.5?'#f59e0b':'#ef4444';
+  return `
+    <div style="margin:12px 0 8px">
+      <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted);margin-bottom:4px">
+        <span>0</span><span>0.8</span><span>1.3</span><span>1.5</span><span>2.0</span>
+      </div>
+      <div style="height:12px;background:var(--border);border-radius:6px;overflow:hidden;position:relative">
+        <div style="position:absolute;left:40%;width:25%;height:100%;background:#d1fae5;opacity:.4"></div>
+        <div style="height:100%;width:${pct}%;background:${col};border-radius:6px;transition:.4s"></div>
+      </div>
+      <div style="margin-top:8px">${acwrBadge(ratio)}</div>
+    </div>`;
+}
+function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;'); }
+
+/* ==========================================================
+   SERVICE WORKER (enregistrement unique dans requestNotifPermission)
+   ========================================================== */
+
+function logoutStaff(){
+  if(_staffTimer) clearTimeout(_staffTimer);
+  _staffTimer = null;
+  ['p1','p2','p3','p4'].forEach(id=>document.getElementById(id).value='');
+  showScreen('home');
+}
+
+/* ==========================================================
+   INIT
+   ========================================================== */
+document.addEventListener('DOMContentLoaded',async()=>{
+  await requestNotifPermission();
+  scheduleNotifications();
+  updateNotifStatus();
+  // init qconfig if not set
+  if(!localStorage.getItem('qconfig')) DB.set('qconfig',DEFAULT_QCONFIG());
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden) scheduleNotifications();});
+});
+</script>
+</body>
+</html>
