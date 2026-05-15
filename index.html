@@ -202,6 +202,50 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 }
 
 /* Print / PDF export */
+/* SMART ALERTS PANEL */
+.alert-card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;border-left:4px solid var(--danger);box-shadow:var(--shadow)}
+.alert-card.warning{border-left-color:var(--warning)}
+.alert-card.info{border-left-color:var(--primary)}
+.alert-card-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.alert-card-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;flex-shrink:0;color:#fff}
+.alert-card-avatar.danger{background:linear-gradient(135deg,#ef4444,#dc2626)}
+.alert-card-avatar.warning{background:linear-gradient(135deg,#f97316,#ea580c)}
+.alert-card-avatar.info{background:linear-gradient(135deg,var(--primary),#7c3aed)}
+.alert-card-body{font-size:.85rem;color:var(--text);line-height:1.5}
+.alert-card-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.alert-tag{padding:3px 10px;border-radius:8px;font-size:.72rem;font-weight:700}
+.alert-tag-red{background:#fee2e2;color:#991b1b}
+.alert-tag-orange{background:#ffedd5;color:#9a3412}
+.alert-tag-blue{background:#dbeafe;color:#1e40af}
+.alert-tag-purple{background:#ede9fe;color:#5b21b6}
+.alert-severity{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:8px;font-size:.72rem;font-weight:800}
+.severity-critical{background:#ef4444;color:#fff}
+.severity-high{background:#f97316;color:#fff}
+.severity-moderate{background:#f59e0b;color:#fff}
+.severity-low{background:#3b82f6;color:#fff}
+
+/* DAILY DIGEST */
+.digest-section{margin-bottom:16px}
+.digest-section h4{font-size:.9rem;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.digest-metric{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--bg);border-radius:10px;margin-bottom:6px;font-size:.85rem}
+.digest-metric .val{font-weight:800;font-size:1rem}
+.digest-player-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border-radius:10px;margin-bottom:6px}
+.digest-player-row .name{font-weight:700;font-size:.85rem;flex:1}
+.digest-player-row .detail{font-size:.78rem;color:var(--muted)}
+
+/* NOTIF SCHEDULE PREVIEW */
+.notif-timeline{position:relative;padding-left:20px;margin:12px 0}
+.notif-timeline::before{content:'';position:absolute;left:7px;top:0;bottom:0;width:2px;background:var(--border)}
+.notif-event{position:relative;padding:8px 0 8px 16px;font-size:.82rem}
+.notif-event::before{content:'';position:absolute;left:-17px;top:12px;width:10px;height:10px;border-radius:50%;border:2px solid var(--primary);background:var(--card)}
+.notif-event.sent::before{background:var(--success);border-color:var(--success)}
+.notif-event.pending::before{background:var(--secondary);border-color:var(--secondary)}
+
+/* SHARE/EXPORT BUTTONS */
+.share-bar{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.share-btn{display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:10px;border:1.5px solid var(--border);background:var(--card);font-size:.82rem;font-weight:700;cursor:pointer;transition:.15s}
+.share-btn:active{transform:scale(.97);background:var(--bg)}
+
 @media print{
   body{background:#fff!important;color:#1e293b!important;font-size:11pt}
   .screen{display:none!important;padding:0!important;max-width:100%!important}
@@ -321,8 +365,35 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
   <div class="tabs">
     <button class="tab active" onclick="switchTab('rapport')">📊 Rapport</button>
+    <button class="tab" onclick="switchTab('alertes')" id="tab-btn-alertes" style="position:relative">🚨 Alertes <span id="alert-badge-count" class="notif-badge hidden">0</span></button>
     <button class="tab" onclick="switchTab('joueuses')">👥 Joueuses</button>
     <button class="tab" onclick="switchTab('config')">⚙️ Config</button>
+  </div>
+
+  <!-- TAB ALERTES INTELLIGENTES -->
+  <div id="tab-alertes" class="hidden">
+    <div class="card">
+      <div class="flex-between mb-12">
+        <h3>🚨 Alertes Intelligentes</h3>
+        <button class="btn btn-sm btn-ghost" onclick="generateDigestText()">📋 Copier le bilan</button>
+      </div>
+      <p class="text-muted mb-12" style="font-size:.78rem">Analyse multi-critères automatique : tendances, charge, bien-être et risques blessures.</p>
+      <div id="smart-alerts-container"></div>
+    </div>
+    <div class="card">
+      <h3 class="mb-8">📊 Résumé Quotidien</h3>
+      <p class="text-muted mb-12" style="font-size:.78rem">Vue synthétique pour consultation rapide sur iPhone.</p>
+      <div id="daily-digest-container"></div>
+    </div>
+    <div class="card">
+      <h3 class="mb-8">📅 Historique des Alertes (7 jours)</h3>
+      <div id="alerts-history-container"></div>
+    </div>
+    <div class="share-bar">
+      <button class="share-btn" onclick="generateDigestText()">📋 Copier le résumé</button>
+      <button class="share-btn" onclick="shareDigestNative()">📤 Partager</button>
+      <button class="share-btn" onclick="exportAlertsCSV()">📥 Export CSV alertes</button>
+    </div>
   </div>
 
   <!-- TAB RAPPORT -->
@@ -775,6 +846,8 @@ function renderPlayerList(){
 function selectPlayer(pid){
   currentPlayer = getPlayers().find(p=>p.id===pid);
   if(!currentPlayer) return;
+  // Enregistre la subscription push pour cette joueuse
+  registerPushForPlayer(currentPlayer);
   const today = todayKey();
   const resp  = getResponses();
   const days7 = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
@@ -909,6 +982,8 @@ function submitQuestionnaire(){
   all.push(resp);
   DB.set('responses',all);
   cancelReminder(currentPlayer.id, currentQType, currentSession);
+  // Signale au backend push que la joueuse a répondu (stoppe les relances)
+  markRespondedOnServer(currentPlayer.id, currentQType);
   const typeLabel = currentQType==='morning'?'Bien-être Matinal':'Charge de Séance';
   document.getElementById('success-message').textContent = `"${typeLabel}" enregistré. Merci ${firstName(currentPlayer.name)} ! 🎉`;
   showScreen('success');
@@ -1002,12 +1077,13 @@ function setDashboardDate(offsetDays){
   loadDashboard();
 }
 function switchTab(tab){
-  ['rapport','joueuses','config'].forEach(t=>{
+  ['rapport','alertes','joueuses','config'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('hidden',t!==tab);
   });
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    t.classList.toggle('active',['rapport','joueuses','config'][i]===tab);
+    t.classList.toggle('active',['rapport','alertes','joueuses','config'][i]===tab);
   });
+  if(tab==='alertes')  { renderSmartAlerts(); renderDailyDigest(); renderAlertsHistory(); }
   if(tab==='joueuses') renderJoueusesTab();
   if(tab==='config')   renderConfigTab();
 }
@@ -1022,6 +1098,7 @@ function loadDashboard(){
   renderChartRPEBars();
   renderChartSleepTrend();
   renderChartTeamOverview();
+  updateAlertBadge();
 }
 function renderDashStats(){
   const players = getPlayers();
@@ -2134,6 +2211,7 @@ function renderPlayersConfig(){
       </div>
       <div style="display:flex;gap:6px">
         <button onclick="togglePlayerNotif('${p.id}')" style="${notifStyle};border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem" title="${notifOn?'Désactiver les notifications':'Activer les notifications'}">${notifIcon}</button>
+        <button onclick="testPushForPlayer('${p.id}')" style="background:#ede9fe;color:#5b21b6;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem" title="Tester la notification push">📨</button>
         <button onclick="editPlayer('${p.id}')" style="background:#dbeafe;color:#1e40af;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem">✏️</button>
         <button onclick="deletePlayer('${p.id}')" style="background:#fee2e2;color:#991b1b;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem">🗑️</button>
       </div>
@@ -2396,18 +2474,115 @@ function loadNotifSettingsUI(){
 }
 // === FIN RÉGLAGES NOTIFICATIONS ===
 
+// ══════════════════════════════════════════════
+// PUSH CONFIG — Remplacez par vos valeurs Firebase
+// ══════════════════════════════════════════════
+const PUSH_CONFIG = {
+  serverUrl: '',   // Ex: 'https://us-central1-rpe-suivi-push.cloudfunctions.net'
+  vapidPublicKey: '', // Votre clé publique VAPID
+  enabled: false   // Passez à true une fois Firebase configuré
+};
+
+function urlBase64ToUint8Array(base64String){
+  const padding='='.repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,'+').replace(/_/g,'/');
+  const rawData=window.atob(base64);
+  return Uint8Array.from([...rawData].map(c=>c.charCodeAt(0)));
+}
+
 async function requestNotifPermission(){
   if(!('Notification' in window)) return false;
   // Enregistre le SW d'abord pour que les notifs fonctionnent sur mobile
   if('serviceWorker' in navigator){
     try { await navigator.serviceWorker.register('sw.js'); } catch(e){}
   }
-  if(Notification.permission==='granted') return true;
+  if(Notification.permission==='granted'){
+    // Si push backend activé, tenter l'abonnement push silencieux
+    if(PUSH_CONFIG.enabled) subscribePushQuiet();
+    return true;
+  }
   if(Notification.permission!=='denied'){
     const p=await Notification.requestPermission();
+    if(p==='granted' && PUSH_CONFIG.enabled) subscribePushQuiet();
     return p==='granted';
   }
   return false;
+}
+
+// Abonnement push silencieux (sans bloquer l'UI)
+async function subscribePushQuiet(){
+  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.vapidPublicKey || !PUSH_CONFIG.serverUrl) return;
+  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(PUSH_CONFIG.vapidPublicKey)
+      });
+    }
+    // Stocke la subscription localement pour l'envoyer au backend quand on connaît le playerId
+    DB.set('pushSubscription', sub.toJSON());
+  } catch(e){
+    console.warn('[Push] Abonnement push échoué:', e.message);
+  }
+}
+
+// Envoie la subscription au backend pour une joueuse spécifique
+async function registerPushForPlayer(player){
+  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.serverUrl) return;
+  const sub = DB.get('pushSubscription');
+  if(!sub) return;
+  try{
+    await fetch(PUSH_CONFIG.serverUrl+'/subscribe',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        playerId: player.id,
+        playerName: player.name,
+        equipe: player.equipe||'A',
+        subscription: sub
+      })
+    });
+    console.log('[Push] Joueuse inscrite:', player.name);
+  } catch(e){
+    console.warn('[Push] Erreur inscription:', e.message);
+  }
+}
+
+// Signale au backend qu'une joueuse a répondu (stoppe les relances)
+async function markRespondedOnServer(playerId, type){
+  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.serverUrl) return;
+  try{
+    await fetch(PUSH_CONFIG.serverUrl+'/markResponded',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ playerId, type })
+    });
+  } catch(e){
+    console.warn('[Push] Erreur markResponded:', e.message);
+  }
+}
+
+// Test push depuis le dashboard staff
+async function testPushForPlayer(playerId){
+  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.serverUrl){
+    alert('⚠️ Push backend non configuré.\nModifiez PUSH_CONFIG dans index.html.');
+    return;
+  }
+  try{
+    const resp = await fetch(PUSH_CONFIG.serverUrl+'/sendTestPush',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ playerId })
+    });
+    const data = await resp.json();
+    if(data.success) alert('✅ Notification test envoyée !');
+    else alert('❌ Erreur: '+(data.error||'inconnue'));
+  } catch(e){
+    alert('❌ Erreur réseau: '+e.message);
+  }
 }
 function scheduleNotifications(){
   const players=getPlayers();
@@ -2555,6 +2730,438 @@ function renderACWRGauge(ratio){
 function escHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;'); }
 
 /* ==========================================================
+   SMART ALERTS ENGINE — Analyse multi-critères
+   ========================================================== */
+function analyzePlayerRisks(player, allResponses){
+  const pid = player.id;
+  const resp = allResponses.filter(r=>r.playerId===pid);
+  const alerts = [];
+  const last3 = getLastNDays(3);
+  const last7 = getLastNDays(7);
+  const today = todayKey();
+  const thresholds = getAlertThresholds();
+
+  // --- 1. ACWR Risk ---
+  const tResps = resp.filter(r=>r.type==='training');
+  const acwr = calcACWR(tResps);
+  if(acwr!==null){
+    const r = parseFloat(acwr);
+    if(r>1.5) alerts.push({severity:'critical',type:'acwr',msg:`Ratio ACWR dangereux (${acwr})`,detail:'Charge aiguë très supérieure à la charge chronique — risque de blessure élevé.',tags:['ACWR','Surcharge']});
+    else if(r>1.3) alerts.push({severity:'high',type:'acwr',msg:`ACWR en zone à risque (${acwr})`,detail:'Augmentation de charge significative — surveillance recommandée.',tags:['ACWR','Attention']});
+    else if(r<0.6) alerts.push({severity:'moderate',type:'acwr',msg:`Sous-entraînement marqué (ACWR: ${acwr})`,detail:'Très faible charge récente — risque de déconditionnement.',tags:['ACWR','Sous-charge']});
+  }
+
+  // --- 2. Fatigue Trend (3 derniers jours) ---
+  const fatigue3 = last3.map(d=>{
+    const mr = resp.find(x=>x.date===d&&x.type==='morning');
+    return mr?.answers?.q_fatigue ?? null;
+  }).filter(v=>v!==null);
+  if(fatigue3.length>=2 && fatigue3.every(v=>v<=thresholds.fatigue)){
+    alerts.push({severity:'high',type:'fatigue_trend',msg:'Fatigue persistante ('+fatigue3.length+' jours)',detail:`Fatigue ≤ ${thresholds.fatigue}/10 sur les ${fatigue3.length} derniers jours consécutifs.`,tags:['Fatigue','Tendance']});
+  }
+
+  // --- 3. Sleep Trend ---
+  const sleep3 = last3.map(d=>{
+    const mr = resp.find(x=>x.date===d&&x.type==='morning');
+    return mr?.answers?.q_sleep ?? null;
+  }).filter(v=>v!==null);
+  if(sleep3.length>=2 && sleep3.every(v=>v<=thresholds.sleep)){
+    alerts.push({severity:'high',type:'sleep_trend',msg:'Sommeil dégradé ('+sleep3.length+' jours)',detail:`Sommeil ≤ ${thresholds.sleep}/10 sur les ${sleep3.length} derniers jours consécutifs.`,tags:['Sommeil','Tendance']});
+  }
+
+  // --- 4. Mood Drop ---
+  const mood7 = last7.map(d=>{
+    const mr = resp.find(x=>x.date===d&&x.type==='morning');
+    return mr?.answers?.q_mood ?? null;
+  }).filter(v=>v!==null);
+  if(mood7.length>=3){
+    const recentMood = mood7.slice(-3);
+    const olderMood = mood7.slice(0, -3);
+    if(olderMood.length>0){
+      const avgRecent = recentMood.reduce((a,b)=>a+b,0)/recentMood.length;
+      const avgOlder = olderMood.reduce((a,b)=>a+b,0)/olderMood.length;
+      if(avgRecent < avgOlder - 2){
+        alerts.push({severity:'moderate',type:'mood_drop',msg:`Chute d'humeur détectée (${avgRecent.toFixed(1)} vs ${avgOlder.toFixed(1)})`,detail:'Baisse significative de l\'humeur par rapport aux jours précédents.',tags:['Humeur','Chute']});
+      }
+    }
+    if(recentMood.every(v=>v<=thresholds.mood)){
+      alerts.push({severity:'high',type:'mood_low',msg:`Humeur basse persistante`,detail:`Humeur ≤ ${thresholds.mood}/10 sur les 3 derniers jours.`,tags:['Humeur','Alerte']});
+    }
+  }
+
+  // --- 5. Pain declared ---
+  const todayMorning = resp.find(r=>r.date===today&&r.type==='morning');
+  if(todayMorning?.answers?.q_pain===true){
+    alerts.push({severity:'high',type:'pain',msg:'Douleurs déclarées aujourd\'hui',detail:'La joueuse a signalé des douleurs physiques ce matin.',tags:['Douleur','Aujourd\'hui']});
+  }
+
+  // --- 6. RPE spike today ---
+  const todayTraining = resp.filter(r=>r.date===today&&r.type==='training');
+  todayTraining.forEach(tr=>{
+    if(tr.answers?.q_rpe >= thresholds.rpe){
+      alerts.push({severity:'moderate',type:'rpe_spike',msg:`RPE très élevé aujourd'hui (${tr.answers.q_rpe}/10)`,detail:`Séance ${tr.sessionLabel||'du jour'} perçue comme extrêmement intense.`,tags:['RPE','Séance']});
+    }
+  });
+
+  // --- 7. Period pain ---
+  if(todayMorning?.answers?.q_period >= thresholds.period){
+    alerts.push({severity:'moderate',type:'period',msg:`Règles intenses (${todayMorning.answers.q_period}/10)`,detail:'Douleurs menstruelles significatives signalées.',tags:['Règles']});
+  }
+
+  // --- 8. Combined risk score ---
+  const riskScore = alerts.reduce((s,a)=>{
+    if(a.severity==='critical') return s+4;
+    if(a.severity==='high') return s+3;
+    if(a.severity==='moderate') return s+2;
+    return s+1;
+  },0);
+
+  // --- 9. Missing data (no response for 2+ days) ---
+  const lastResp = resp.sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const playerAge = player.id ? Math.floor((Date.now() - parseInt(player.id)) / 86400000) : 999;
+  if(lastResp){
+    const daysSince = Math.floor((new Date(today) - new Date(lastResp.date)) / 86400000);
+    if(daysSince >= 3 && playerAge >= 2){
+      alerts.push({severity:'moderate',type:'missing',msg:`Aucune réponse depuis ${daysSince} jours`,detail:'La joueuse n\'a pas rempli de questionnaire récemment.',tags:['Absence','Données']});
+    }
+  } else if(resp.length===0 && playerAge >= 2){
+    alerts.push({severity:'low',type:'no_data',msg:'Aucune donnée enregistrée',detail:'La joueuse n\'a encore rempli aucun questionnaire.',tags:['Nouveau']});
+  }
+
+  return {player, alerts, riskScore};
+}
+
+function updateAlertBadge(){
+  const players = getPlayers();
+  const allResp = getResponses();
+  const count = players.map(p=>analyzePlayerRisks(p, allResp))
+    .filter(a=>a.alerts.some(al=>al.severity!=='low')).length;
+  const badge = document.getElementById('alert-badge-count');
+  if(badge){
+    if(count>0){
+      badge.textContent = count;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+}
+
+function renderSmartAlerts(){
+  updateAlertBadge();
+  const container = document.getElementById('smart-alerts-container');
+  const players = getPlayers();
+  const allResp = getResponses();
+
+  if(!players.length){
+    container.innerHTML='<p class="text-muted">Aucune joueuse configurée.</p>';
+    return;
+  }
+
+  const analyses = players.map(p=>analyzePlayerRisks(p, allResp))
+    .filter(a=>a.alerts.length>0)
+    .sort((a,b)=>b.riskScore-a.riskScore);
+
+  if(!analyses.length){
+    container.innerHTML=`
+      <div style="text-align:center;padding:30px 0">
+        <div style="font-size:3rem;margin-bottom:12px">✅</div>
+        <p class="bold" style="color:var(--success);font-size:1.1rem">Tout va bien !</p>
+        <p class="text-muted mt-8">Aucune alerte détectée pour l'ensemble de l'effectif.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = analyses.map(({player, alerts, riskScore})=>{
+    const sevClass = riskScore >= 6 ? 'danger' : riskScore >= 3 ? 'warning' : 'info';
+    const sevLabel = riskScore >= 6 ? 'Critique' : riskScore >= 3 ? 'Élevé' : 'Modéré';
+    const sevBadge = riskScore >= 6 ? 'severity-critical' : riskScore >= 3 ? 'severity-high' : 'severity-moderate';
+    const borderClass = riskScore >= 6 ? '' : riskScore >= 3 ? ' warning' : ' info';
+
+    return `
+    <div class="alert-card${borderClass}">
+      <div class="alert-card-header">
+        <div class="alert-card-avatar ${sevClass}">${player.name.charAt(0).toUpperCase()}</div>
+        <div style="flex:1">
+          <div class="bold">${escHtml(player.name)}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:2px">
+            <span class="alert-severity ${sevBadge}">● ${sevLabel}</span>
+            <span class="text-muted" style="font-size:.72rem">${alerts.length} alerte${alerts.length>1?'s':''}</span>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-ghost" onclick="showPlayerReport('${player.id}')" style="padding:6px 10px">Voir →</button>
+      </div>
+      <div class="alert-card-body">
+        ${alerts.map(a=>`
+          <div style="padding:6px 0;${alerts.indexOf(a)<alerts.length-1?'border-bottom:1px solid var(--border)':''}">
+            <div style="font-weight:600;font-size:.83rem">${a.msg}</div>
+            <div style="font-size:.76rem;color:var(--muted);margin-top:2px">${a.detail}</div>
+            <div class="alert-card-tags">
+              ${a.tags.map(t=>`<span class="alert-tag ${a.severity==='critical'?'alert-tag-red':a.severity==='high'?'alert-tag-orange':'alert-tag-blue'}">${t}</span>`).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ==========================================================
+   DAILY DIGEST — Résumé quotidien optimisé iPhone
+   ========================================================== */
+function renderDailyDigest(){
+  const container = document.getElementById('daily-digest-container');
+  const players = getPlayers();
+  const resp = getResponses();
+  const today = todayKey();
+  const mResps = resp.filter(r=>r.date===today&&r.type==='morning');
+  const tResps = resp.filter(r=>r.date===today&&r.type==='training');
+  const days7 = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+  const todayN = days7[new Date().getDay()];
+  const withT = players.filter(p=>p.trainingDays?.[todayN]?.active);
+
+  // Compliance
+  const morningPct = players.length ? Math.round((mResps.length/players.length)*100) : 0;
+  const trainingPct = withT.length ? Math.round((tResps.length/withT.length)*100) : 0;
+
+  // Averages
+  const avgSleep = avg(mResps,'q_sleep');
+  const avgFatigue = avg(mResps,'q_fatigue');
+  const avgMood = avg(mResps,'q_mood');
+  const avgRPE = avg(tResps,'q_rpe');
+
+  // Players not yet responded
+  const notDoneMorning = players.filter(p=>!mResps.some(r=>r.playerId===p.id));
+  const notDoneTraining = withT.filter(p=>!tResps.some(r=>r.playerId===p.id));
+
+  // Players with pain
+  const withPain = mResps.filter(r=>r.answers.q_pain===true);
+
+  const dateStr = new Date(today+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+
+  container.innerHTML = `
+    <div class="digest-section">
+      <h4>📅 ${dateStr}</h4>
+      <div class="digest-metric">
+        <span>🌅 Questionnaire matin</span>
+        <span class="val" style="color:${morningPct>=80?'var(--success)':morningPct>=50?'var(--warning)':'var(--danger)'}">${mResps.length}/${players.length} (${morningPct}%)</span>
+      </div>
+      <div class="digest-metric">
+        <span>💪 Charge séance</span>
+        <span class="val" style="color:${trainingPct>=80?'var(--success)':trainingPct>=50?'var(--warning)':'var(--danger)'}">${tResps.length}/${withT.length} (${trainingPct}%)</span>
+      </div>
+    </div>
+    <div class="digest-section">
+      <h4>📊 Moyennes du jour</h4>
+      <div class="digest-metric"><span>😴 Sommeil</span><span class="val">${avgSleep||'—'}/10</span></div>
+      <div class="digest-metric"><span>⚡ Fatigue/Énergie</span><span class="val">${avgFatigue||'—'}/10</span></div>
+      <div class="digest-metric"><span>😊 Humeur</span><span class="val">${avgMood||'—'}/10</span></div>
+      <div class="digest-metric"><span>💪 RPE séance</span><span class="val">${avgRPE||'—'}/10</span></div>
+    </div>
+    ${withPain.length?`
+    <div class="digest-section">
+      <h4>🤕 Douleurs signalées</h4>
+      ${withPain.map(r=>`
+        <div class="digest-player-row">
+          <div class="player-avatar" style="width:32px;height:32px;font-size:.8rem;background:linear-gradient(135deg,#ef4444,#dc2626)">${(r.playerName||'?').charAt(0)}</div>
+          <div class="name">${escHtml(firstName(r.playerName))}</div>
+          <div class="detail">${r.comment?escHtml(r.comment.substring(0,50))+'…':'Douleur déclarée'}</div>
+        </div>`).join('')}
+    </div>`:''}
+    ${notDoneMorning.length?`
+    <div class="digest-section">
+      <h4>⏳ En attente (matin)</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${notDoneMorning.map(p=>`<span class="badge badge-yellow">${escHtml(firstName(p.name))}</span>`).join('')}
+      </div>
+    </div>`:''}
+    ${notDoneTraining.length?`
+    <div class="digest-section">
+      <h4>⏳ En attente (séance)</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${notDoneTraining.map(p=>`<span class="badge badge-yellow">${escHtml(firstName(p.name))}</span>`).join('')}
+      </div>
+    </div>`:''}
+  `;
+}
+
+/* ==========================================================
+   ALERTS HISTORY — 7 derniers jours
+   ========================================================== */
+function renderAlertsHistory(){
+  const container = document.getElementById('alerts-history-container');
+  const players = getPlayers();
+  const allResp = getResponses();
+  const last7 = getLast7Days();
+
+  const dayAlerts = last7.map(date=>{
+    const dayResp = allResp.filter(r=>r.date===date);
+    const thresholds = getAlertThresholds();
+    let count = 0;
+    let criticals = [];
+    dayResp.forEach(r=>{
+      if(r.answers.q_pain===true){ count++; criticals.push(firstName(r.playerName)+' 🤕'); }
+      if(typeof r.answers.q_fatigue==='number'&&r.answers.q_fatigue<=thresholds.fatigue){ count++; }
+      if(typeof r.answers.q_rpe==='number'&&r.answers.q_rpe>=thresholds.rpe){ count++; criticals.push(firstName(r.playerName)+' 🔥'); }
+      if(typeof r.answers.q_mood==='number'&&r.answers.q_mood<=thresholds.mood){ count++; }
+      if(typeof r.answers.q_sleep==='number'&&r.answers.q_sleep<=thresholds.sleep){ count++; }
+    });
+    return {date, count, criticals: [...new Set(criticals)], responses: dayResp.length};
+  });
+
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center">
+      ${dayAlerts.map(d=>{
+        const dt = new Date(d.date+'T12:00:00');
+        const dayL = ['D','L','Ma','Me','J','V','S'][dt.getDay()];
+        const bgColor = d.count===0?'#d1fae5':d.count<=2?'#fef3c7':d.count<=4?'#ffedd5':'#fee2e2';
+        const textColor = d.count===0?'#065f46':d.count<=2?'#92400e':d.count<=4?'#9a3412':'#991b1b';
+        return `
+        <div style="background:${bgColor};border-radius:10px;padding:10px 4px;cursor:default" title="${d.criticals.join(', ')||'RAS'}">
+          <div style="font-size:.68rem;color:var(--muted);font-weight:700">${dayL}</div>
+          <div style="font-size:.72rem;color:var(--muted)">${dt.getDate()}</div>
+          <div style="font-size:1.1rem;font-weight:900;color:${textColor};margin-top:4px">${d.count}</div>
+          <div style="font-size:.6rem;color:var(--muted)">alerte${d.count>1?'s':''}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+/* ==========================================================
+   SHARING & EXPORT — Bilan texte copiable / partageable
+   ========================================================== */
+function generateDigestTextContent(){
+  const players = getPlayers();
+  const resp = getResponses();
+  const today = todayKey();
+  const dateStr = new Date(today+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const mResps = resp.filter(r=>r.date===today&&r.type==='morning');
+  const tResps = resp.filter(r=>r.date===today&&r.type==='training');
+  const avgSleep = avg(mResps,'q_sleep');
+  const avgFatigue = avg(mResps,'q_fatigue');
+  const avgRPE = avg(tResps,'q_rpe');
+
+  let text = `🏐 BILAN RPE — ${dateStr}\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+  text += `📊 COMPLIANCE\n`;
+  text += `• Matin : ${mResps.length}/${players.length}\n`;
+  text += `• Séance : ${tResps.length} réponses\n\n`;
+  text += `📈 MOYENNES\n`;
+  text += `• Sommeil : ${avgSleep||'—'}/10\n`;
+  text += `• Fatigue : ${avgFatigue||'—'}/10\n`;
+  text += `• RPE : ${avgRPE||'—'}/10\n\n`;
+
+  // Alerts
+  const analyses = players.map(p=>analyzePlayerRisks(p, resp)).filter(a=>a.alerts.length>0).sort((a,b)=>b.riskScore-a.riskScore);
+  if(analyses.length){
+    text += `🚨 ALERTES\n`;
+    analyses.forEach(({player, alerts, riskScore})=>{
+      const level = riskScore >= 6 ? '🔴' : riskScore >= 3 ? '🟠' : '🟡';
+      text += `${level} ${player.name} :\n`;
+      alerts.forEach(a=>{ text += `   → ${a.msg}\n`; });
+    });
+    text += '\n';
+  } else {
+    text += `✅ Aucune alerte détectée.\n\n`;
+  }
+
+  // Pain
+  const withPain = mResps.filter(r=>r.answers.q_pain===true);
+  if(withPain.length){
+    text += `🤕 DOULEURS : ${withPain.map(r=>firstName(r.playerName)).join(', ')}\n`;
+  }
+
+  text += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `Généré via RPE Suivi`;
+  return text;
+}
+
+function generateDigestText(){
+  const text = generateDigestTextContent();
+  navigator.clipboard.writeText(text).then(()=>{
+    alert('📋 Bilan copié dans le presse-papier !\nCollez-le dans WhatsApp, SMS ou email.');
+  }).catch(()=>{
+    // Fallback for iOS
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position='fixed';
+    ta.style.opacity='0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert('📋 Bilan copié !');
+  });
+}
+
+async function shareDigestNative(){
+  const text = generateDigestTextContent();
+  if(navigator.share){
+    try{
+      await navigator.share({title:'Bilan RPE du jour', text});
+    } catch(e){ /* user cancelled */ }
+  } else {
+    generateDigestText(); // fallback to copy
+  }
+}
+
+function exportAlertsCSV(){
+  const players = getPlayers();
+  const allResp = getResponses();
+  const analyses = players.map(p=>analyzePlayerRisks(p, allResp));
+  const rows = [['Joueuse','Équipe','Score Risque','Nb Alertes','Alertes']];
+  analyses.forEach(({player, alerts, riskScore})=>{
+    rows.push([player.name, player.equipe||'A', riskScore, alerts.length, alerts.map(a=>a.msg).join(' | ')]);
+  });
+  const csv = rows.map(r=>r.join(';')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `alertes-rpe-${todayKey()}.csv`;
+  a.click();
+}
+
+/* ==========================================================
+   ENHANCED iOS NOTIFICATIONS
+   ========================================================== */
+// Amélioration : notification groupée pour le staff
+function sendStaffSummaryNotif(){
+  if(Notification.permission!=='granted') return;
+  const players = getPlayers();
+  const allResp = getResponses();
+  const analyses = players.map(p=>analyzePlayerRisks(p, allResp)).filter(a=>a.alerts.length>0);
+  const critCount = analyses.filter(a=>a.riskScore>=6).length;
+  const highCount = analyses.filter(a=>a.riskScore>=3&&a.riskScore<6).length;
+
+  if(analyses.length===0) return;
+
+  const title = `🚨 RPE Suivi — ${analyses.length} joueuse${analyses.length>1?'s':''} en alerte`;
+  const body = (critCount?`🔴 ${critCount} critique${critCount>1?'s':''} `:'')
+    + (highCount?`🟠 ${highCount} élevée${highCount>1?'s':''} `:'')
+    + `— Consultez le tableau de bord`;
+
+  if('serviceWorker' in navigator && navigator.serviceWorker.controller){
+    navigator.serviceWorker.ready.then(reg=>{
+      reg.showNotification(title,{body, tag:'staff-summary', requireInteraction:true, icon:'https://delacourtedf-cmyk.github.io/suivi-rpe/icon.png'});
+    });
+  } else {
+    new Notification(title,{body, tag:'staff-summary'});
+  }
+}
+
+// Schedule staff summary notification at configurable time
+function scheduleStaffDigestNotif(){
+  const hour = 20; // 20h par défaut
+  const now = new Date();
+  const target = new Date();
+  target.setHours(hour, 0, 0, 0);
+  let delay = target - now;
+  if(delay <= 0) return; // Already past
+  if(window._staffDigestTimer) clearTimeout(window._staffDigestTimer);
+  window._staffDigestTimer = setTimeout(sendStaffSummaryNotif, delay);
+}
+
+/* ==========================================================
    SERVICE WORKER (enregistrement unique dans requestNotifPermission)
    ========================================================== */
 
@@ -2571,10 +3178,11 @@ function logoutStaff(){
 document.addEventListener('DOMContentLoaded',async()=>{
   await requestNotifPermission();
   scheduleNotifications();
+  scheduleStaffDigestNotif();
   updateNotifStatus();
   // init qconfig if not set
   if(!localStorage.getItem('qconfig')) DB.set('qconfig',DEFAULT_QCONFIG());
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden) scheduleNotifications();});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){ scheduleNotifications(); scheduleStaffDigestNotif(); }});
 });
 </script>
 </body>
