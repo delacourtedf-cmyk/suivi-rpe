@@ -274,6 +274,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button class="btn btn-outline" onclick="goToStaffLogin()">Accès Staff</button>
     </div>
     <p class="text-muted" style="font-size:.72rem;margin-top:8px" id="notif-status-home"></p>
+    <p style="font-size:.72rem;margin-top:4px" id="sync-status"></p>
   </div>
 </div>
 
@@ -483,7 +484,54 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <!-- TAB CONFIG -->
   <div id="tab-config" class="hidden">
 
-    <!-- Ajouter joueuse -->
+    <!-- ===== AJOUT GROUPÉ PAR ROSTER ===== -->
+    <div class="card">
+      <h3 class="mb-8">👥 Ajout groupé — Roster</h3>
+      <p class="text-muted mb-12" style="font-size:.8rem">Saisissez les prénoms/noms (un par ligne), choisissez l'équipe et le planning commun, puis ajoutez-les tous d'un coup.</p>
+      <div class="form-group">
+        <label class="form-label">Liste des joueuses (une par ligne)</label>
+        <textarea id="roster-names" class="comment-area" style="min-height:100px" placeholder="Marie Dupont&#10;Léa Martin&#10;Camille Bernard&#10;..."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <div style="flex:1">
+          <label class="form-label">Équipe</label>
+          <select id="roster-equipe" class="form-select">
+            <option value="A">Équipe A</option>
+            <option value="B">Équipe B</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label class="form-label">Heure matin</label>
+          <input type="time" id="roster-morning" class="form-input" value="08:00">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Planning commun</label>
+        <p class="text-muted" style="font-size:.75rem;margin-bottom:6px">Sélectionnez les jours et configurez les séances. Toutes les joueuses du roster auront ce planning.</p>
+        <div class="toggle-group" id="roster-days">
+          <button class="toggle-day" data-day="lundi">Lun</button>
+          <button class="toggle-day" data-day="mardi">Mar</button>
+          <button class="toggle-day" data-day="mercredi">Mer</button>
+          <button class="toggle-day" data-day="jeudi">Jeu</button>
+          <button class="toggle-day" data-day="vendredi">Ven</button>
+          <button class="toggle-day" data-day="samedi">Sam</button>
+          <button class="toggle-day" data-day="dimanche">Dim</button>
+        </div>
+      </div>
+      <div id="roster-days-detail"></div>
+      <div class="form-group" id="roster-template-wrap" class="hidden" style="margin-top:8px">
+        <label class="form-label">Ou copier le planning d'une joueuse existante</label>
+        <select id="roster-template-player" class="form-select" onchange="applyRosterTemplate()">
+          <option value="">— Configurer manuellement —</option>
+        </select>
+      </div>
+      <div id="roster-preview" class="hidden" style="margin:12px 0"></div>
+      <button class="btn btn-primary mt-8" onclick="addRoster()">➕ Ajouter toutes les joueuses</button>
+    </div>
+
+    <div class="separator"></div>
+
+    <!-- Ajouter joueuse individuelle -->
     <div class="card">
       <h3 class="mb-12">➕ Ajouter une joueuse</h3>
       <div class="form-group">
@@ -695,7 +743,22 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <script>
 /* ==========================================================
-   DATABASE (LocalStorage)
+   FIREBASE CONFIG — Remplacez par vos valeurs
+   ========================================================== */
+const FIREBASE_CONFIG = {
+  // Collez ici la config de votre projet Firebase (console.firebase.google.com → Paramètres → Général → Vos apps → Config)
+  // apiKey: "AIza...",
+  // authDomain: "rpe-suivi-push.firebaseapp.com",
+  // projectId: "rpe-suivi-push",
+  // storageBucket: "rpe-suivi-push.appspot.com",
+  // messagingSenderId: "...",
+  // appId: "..."
+};
+const FIRESTORE_ENABLED = !!FIREBASE_CONFIG.projectId;
+
+/* ==========================================================
+   DATABASE — Hybride Firestore + LocalStorage
+   Cache local pour offline, Firestore pour la sync
    ========================================================== */
 const DB = {
   get(k, d=null){
@@ -712,7 +775,6 @@ const DB = {
       localStorage.setItem(k,JSON.stringify(v));
     } catch(e){
       if(e.name==='QuotaExceededError'){
-        // Purge automatique des réponses > 6 mois
         const cutoff = new Date();
         cutoff.setMonth(cutoff.getMonth()-6);
         const cutStr = cutoff.toISOString().split('T')[0];
@@ -727,6 +789,222 @@ const DB = {
     }
   }
 };
+
+// ── Cloud Sync Engine ──────────────────────────────────
+let _firestore = null;
+let _syncReady = false;
+let _syncListeners = [];
+
+async function initFirestore(){
+  if(!FIRESTORE_ENABLED) return;
+  try{
+    // Charge Firebase depuis CDN
+    if(!window.firebase?.apps?.length){
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-app-compat.min.js');
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/firebase/10.12.2/firebase-firestore-compat.min.js');
+      firebase.initializeApp(FIREBASE_CONFIG);
+    }
+    _firestore = firebase.firestore();
+    // Active le cache offline pour fonctionner sans réseau
+    try{ await _firestore.enablePersistence({synchronizeTabs:true}); } catch(e){}
+    _syncReady = true;
+    console.log('[Firestore] Connecté ✓');
+    // Synchronise les données cloud → local
+    await syncFromCloud();
+    // Active l'écoute temps réel
+    listenRealtimeUpdates();
+    updateSyncStatusUI();
+  } catch(e){
+    console.warn('[Firestore] Init échouée, mode local:', e.message);
+    _syncReady = false;
+    updateSyncStatusUI();
+  }
+}
+
+function loadScript(src){
+  return new Promise((resolve,reject)=>{
+    if(document.querySelector(`script[src="${src}"]`)) return resolve();
+    const s=document.createElement('script');
+    s.src=src;
+    s.onload=resolve;
+    s.onerror=reject;
+    document.head.appendChild(s);
+  });
+}
+
+// ── Sync Cloud → Local ──────────────────────────────────
+async function syncFromCloud(){
+  if(!_syncReady) return;
+  try{
+    // Sync players
+    const playersSnap = await _firestore.collection('players').get();
+    const cloudPlayers = [];
+    playersSnap.forEach(doc => cloudPlayers.push({...doc.data(), _docId: doc.id}));
+    if(cloudPlayers.length > 0 || DB.get('players',[]).length === 0){
+      // Merge : cloud gagne si plus récent
+      const localPlayers = DB.get('players',[]);
+      const merged = mergeByField(localPlayers, cloudPlayers, 'id');
+      DB.set('players', merged);
+    }
+
+    // Sync responses
+    const respSnap = await _firestore.collection('responses')
+      .orderBy('timestamp','desc').limit(500).get();
+    const cloudResps = [];
+    respSnap.forEach(doc => cloudResps.push({...doc.data(), _docId: doc.id}));
+    if(cloudResps.length > 0){
+      const localResps = DB.get('responses',[]);
+      const merged = mergeByField(localResps, cloudResps, 'id');
+      DB.set('responses', merged);
+    }
+
+    // Sync settings
+    const settingsDoc = await _firestore.collection('config').doc('settings').get();
+    if(settingsDoc.exists){
+      DB.set('settings', settingsDoc.data());
+    }
+
+    // Sync qconfig
+    const qconfigDoc = await _firestore.collection('config').doc('qconfig').get();
+    if(qconfigDoc.exists){
+      DB.set('qconfig', qconfigDoc.data());
+    }
+
+    // Sync alertThresholds
+    const thresholdsDoc = await _firestore.collection('config').doc('alertThresholds').get();
+    if(thresholdsDoc.exists){
+      DB.set('alertThresholds', thresholdsDoc.data());
+    }
+
+    // Sync notifSettings
+    const notifDoc = await _firestore.collection('config').doc('notifSettings').get();
+    if(notifDoc.exists){
+      DB.set('notifSettings', notifDoc.data());
+    }
+
+    console.log('[Firestore] Sync cloud → local terminée');
+  } catch(e){
+    console.warn('[Firestore] Sync échouée:', e.message);
+  }
+}
+
+// ── Sync Local → Cloud ──────────────────────────────────
+async function syncToCloud(collection, docId, data){
+  if(!_syncReady) return;
+  try{
+    // Nettoie les champs undefined
+    const clean = JSON.parse(JSON.stringify(data));
+    await _firestore.collection(collection).doc(docId).set(clean, {merge:true});
+  } catch(e){
+    console.warn(`[Firestore] Écriture ${collection}/${docId} échouée:`, e.message);
+  }
+}
+
+async function syncDeleteFromCloud(collection, docId){
+  if(!_syncReady) return;
+  try{
+    await _firestore.collection(collection).doc(docId).delete();
+  } catch(e){
+    console.warn(`[Firestore] Suppression ${collection}/${docId} échouée:`, e.message);
+  }
+}
+
+// ── Écoute temps réel ──────────────────────────────────
+function listenRealtimeUpdates(){
+  if(!_syncReady) return;
+
+  // Écoute les changements sur players
+  _firestore.collection('players').onSnapshot(snap=>{
+    const cloudPlayers = [];
+    snap.forEach(doc => cloudPlayers.push(doc.data()));
+    if(cloudPlayers.length > 0){
+      const localPlayers = DB.get('players',[]);
+      const merged = mergeByField(localPlayers, cloudPlayers, 'id');
+      DB.set('players', merged);
+      // Rafraîchit l'UI si on est sur un écran concerné
+      refreshUIIfNeeded();
+    }
+  }, err => console.warn('[Firestore] Listener players erreur:', err.message));
+
+  // Écoute les nouvelles réponses (dernier jour seulement)
+  const today = new Date().toISOString().split('T')[0];
+  _firestore.collection('responses').where('date','>=',today)
+    .onSnapshot(snap=>{
+      const cloudResps = [];
+      snap.forEach(doc => cloudResps.push(doc.data()));
+      if(cloudResps.length > 0){
+        const localResps = DB.get('responses',[]);
+        const merged = mergeByField(localResps, cloudResps, 'id');
+        DB.set('responses', merged);
+        refreshUIIfNeeded();
+      }
+    }, err => console.warn('[Firestore] Listener responses erreur:', err.message));
+}
+
+function refreshUIIfNeeded(){
+  // Si le dashboard est visible, rafraîchit
+  if(document.getElementById('screen-dashboard')?.classList.contains('active')){
+    loadDashboard();
+  }
+  // Si la liste joueuses est visible, rafraîchit
+  if(document.getElementById('screen-player-select')?.classList.contains('active')){
+    renderPlayerList();
+  }
+}
+
+// ── Merge Helper ──────────────────────────────────
+function mergeByField(localArr, cloudArr, field){
+  const map = new Map();
+  // Local d'abord
+  localArr.forEach(item => map.set(item[field], item));
+  // Cloud écrase (plus à jour)
+  cloudArr.forEach(item => {
+    const clean = {...item};
+    delete clean._docId;
+    map.set(item[field], clean);
+  });
+  return Array.from(map.values());
+}
+
+// ── Wrappers pour écrire Local + Cloud ──────────────────
+function savePlayers(players){
+  DB.set('players', players);
+  if(_syncReady){
+    players.forEach(p => syncToCloud('players', p.id, p));
+  }
+}
+
+function saveResponses(responses, newResp){
+  DB.set('responses', responses);
+  if(_syncReady && newResp){
+    syncToCloud('responses', newResp.id, newResp);
+  }
+}
+
+function saveConfig(key, value){
+  DB.set(key, value);
+  if(_syncReady){
+    syncToCloud('config', key, value);
+  }
+}
+
+function deletePlayerFromCloud(pid){
+  syncDeleteFromCloud('players', pid);
+}
+
+// ── Sync Status UI ──────────────────────────────────
+function updateSyncStatusUI(){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  if(!FIRESTORE_ENABLED){
+    el.innerHTML = '<span style="color:var(--muted);font-size:.72rem">📱 Mode local uniquement</span>';
+  } else if(_syncReady){
+    el.innerHTML = '<span style="color:#065f46;font-size:.72rem">☁️ Synchronisé</span>';
+  } else {
+    el.innerHTML = '<span style="color:#92400e;font-size:.72rem">⚠️ Hors ligne (cache local)</span>';
+  }
+}
+
 const getPlayers  = ()=>DB.get('players',[]);
 const getResponses= ()=>DB.get('responses',[]);
 const getSettings = ()=>DB.get('settings',{pin:'1234',notif:false});
@@ -980,7 +1258,7 @@ function submitQuestionnaire(){
   };
   const all = getResponses();
   all.push(resp);
-  DB.set('responses',all);
+  saveResponses(all, resp);
   cancelReminder(currentPlayer.id, currentQType, currentSession);
   // Signale au backend push que la joueuse a répondu (stoppe les relances)
   markRespondedOnServer(currentPlayer.id, currentQType);
@@ -1027,7 +1305,7 @@ async function checkPin(){
     if(!settings.pinHash){
       settings.pinHash = hashed;
       delete settings.pin;
-      DB.set('settings', settings);
+      saveConfig('settings', settings);
     }
     // Auto-logout after 30 min inactivity
     resetStaffTimeout();
@@ -1219,7 +1497,7 @@ function saveAlertThresholds(){
     mood:    parseInt(document.getElementById('alert-mood')?.value)||3,
     sleep:   parseInt(document.getElementById('alert-sleep')?.value)||3
   };
-  DB.set('alertThresholds', t);
+  saveConfig('alertThresholds', t);
   alert('✅ Seuils d\'alerte enregistrés !');
   // Recharge les alertes si on est sur le dashboard
   if(document.getElementById('screen-dashboard').classList.contains('active')) renderAlerts();
@@ -2032,6 +2310,7 @@ function renderConfigTab(){
   renderPlayersConfig();
   loadNotifSettingsUI();
   loadAlertThresholdsUI();
+  initRosterForm();
   // Day toggle listeners
   document.querySelectorAll('#new-days .toggle-day').forEach(btn=>{
     btn.onclick=function(){this.classList.toggle('active');renderDaysDetail();};
@@ -2078,25 +2357,25 @@ function renderQEditor(type){
 function toggleQuestion(type,idx){
   const cfg = getQConfig();
   cfg[type][idx].active = !cfg[type][idx].active;
-  DB.set('qconfig',cfg);
+  saveConfig('qconfig',cfg);
   renderQEditor(type);
 }
 function updateQuestion(type,idx,field,val){
   const cfg = getQConfig();
   cfg[type][idx][field] = val;
-  DB.set('qconfig',cfg);
+  saveConfig('qconfig',cfg);
 }
 function deleteQuestion(type,idx){
   if(!confirm('Supprimer cette question ?')) return;
   const cfg = getQConfig();
   cfg[type].splice(idx,1);
-  DB.set('qconfig',cfg);
+  saveConfig('qconfig',cfg);
   renderQEditor(type);
 }
 function addQuestion(type){
   const cfg = getQConfig();
   cfg[type].push({id:'q_custom_'+Date.now(),active:true,label:'Nouvelle question',type:'borg',hint:''});
-  DB.set('qconfig',cfg);
+  saveConfig('qconfig',cfg);
   renderQEditor(type);
 }
 
@@ -2180,7 +2459,7 @@ function addPlayer(){
   const equipe = document.getElementById('new-equipe')?.value||'A';
   const p = {id:Date.now().toString(),name,morningTime,trainingDays,equipe};
   const players=[...getPlayers(),p];
-  DB.set('players',players);
+  savePlayers(players);
   document.getElementById('new-name').value='';
   document.querySelectorAll('#new-days .toggle-day').forEach(b=>b.classList.remove('active'));
   document.getElementById('days-detail').innerHTML='';
@@ -2210,6 +2489,7 @@ function renderPlayersConfig(){
         </div>
       </div>
       <div style="display:flex;gap:6px">
+        <button onclick="duplicatePlayer('${p.id}')" style="background:#f0fdf4;color:#065f46;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem" title="Copier le profil">📋</button>
         <button onclick="togglePlayerNotif('${p.id}')" style="${notifStyle};border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem" title="${notifOn?'Désactiver les notifications':'Activer les notifications'}">${notifIcon}</button>
         <button onclick="testPushForPlayer('${p.id}')" style="background:#ede9fe;color:#5b21b6;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem" title="Tester la notification push">📨</button>
         <button onclick="editPlayer('${p.id}')" style="background:#dbeafe;color:#1e40af;border:none;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:.8rem">✏️</button>
@@ -2220,11 +2500,217 @@ function renderPlayersConfig(){
 }
 function deletePlayer(pid){
   if(!confirm('Supprimer cette joueuse ? Ses données seront conservées.')) return;
-  DB.set('players',getPlayers().filter(p=>p.id!==pid));
+  savePlayers(getPlayers().filter(p=>p.id!==pid));
+  deletePlayerFromCloud(pid);
   renderPlayersConfig();
 }
 
-// === GESTION NOTIFICATIONS JOUEUSE ===
+// === COPIER UN PROFIL DE JOUEUSE ===
+function duplicatePlayer(pid){
+  const source = getPlayers().find(p=>p.id===pid);
+  if(!source) return;
+  const newName = prompt(`Copier le planning de ${source.name} vers :\n(Entrez le nom de la nouvelle joueuse)`);
+  if(!newName?.trim()) return;
+  const newPlayer = {
+    id: Date.now().toString(),
+    name: newName.trim(),
+    equipe: source.equipe||'A',
+    morningTime: source.morningTime||'08:00',
+    trainingDays: JSON.parse(JSON.stringify(source.trainingDays||{})),
+    notifEnabled: true
+  };
+  // Regénère les IDs des sessions pour éviter les conflits
+  Object.values(newPlayer.trainingDays).forEach(day=>{
+    if(day.sessions){
+      day.sessions.forEach(s=>{ s.id = makeSessId(); });
+    }
+  });
+  const players = [...getPlayers(), newPlayer];
+  savePlayers(players);
+  renderPlayersConfig();
+  alert(`✅ ${newName.trim()} ajoutée avec le planning de ${source.name} !`);
+}
+
+// === AJOUT GROUPÉ PAR ROSTER ===
+function initRosterForm(){
+  // Toggle listeners pour les jours du roster
+  document.querySelectorAll('#roster-days .toggle-day').forEach(btn=>{
+    btn.onclick=function(){ this.classList.toggle('active'); renderRosterDaysDetail(); };
+  });
+  // Peuple le template dropdown
+  populateRosterTemplateDropdown();
+}
+
+function populateRosterTemplateDropdown(){
+  const sel = document.getElementById('roster-template-player');
+  if(!sel) return;
+  const players = getPlayers();
+  sel.innerHTML = '<option value="">— Configurer manuellement —</option>'
+    + players.map(p=>`<option value="${p.id}">${escHtml(p.name)} (Éq. ${escHtml(p.equipe||'A')})</option>`).join('');
+}
+
+function applyRosterTemplate(){
+  const pid = document.getElementById('roster-template-player').value;
+  if(!pid){
+    // Reset to manual
+    document.querySelectorAll('#roster-days .toggle-day').forEach(b=>b.classList.remove('active'));
+    window._rosterSessions = {};
+    document.getElementById('roster-days-detail').innerHTML = '';
+    return;
+  }
+  const source = getPlayers().find(p=>p.id===pid);
+  if(!source) return;
+
+  // Copie l'équipe et l'heure matin
+  const equipeEl = document.getElementById('roster-equipe');
+  if(equipeEl) equipeEl.value = source.equipe||'A';
+  const morningEl = document.getElementById('roster-morning');
+  if(morningEl) morningEl.value = source.morningTime||'08:00';
+
+  // Copie les jours et sessions
+  window._rosterSessions = {};
+  const allDays = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
+  document.querySelectorAll('#roster-days .toggle-day').forEach(btn=>{
+    const d = btn.dataset.day;
+    const cfg = source.trainingDays?.[d];
+    if(cfg?.active){
+      btn.classList.add('active');
+      window._rosterSessions[d] = JSON.parse(JSON.stringify(
+        cfg.sessions || [{id:makeSessId(),type:cfg.type||'volley',endTime:cfg.endTime||'20:00',duration:90,label:'Séance 1'}]
+      ));
+      // Regénère les IDs
+      window._rosterSessions[d].forEach(s=>{ s.id = makeSessId(); });
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  renderRosterDaysDetail();
+  alert(`✅ Planning de ${source.name} appliqué. Vous pouvez le modifier avant de valider.`);
+}
+
+function renderRosterDaysDetail(){
+  const activeDays = Array.from(document.querySelectorAll('#roster-days .toggle-day.active')).map(b=>b.dataset.day);
+  const labels={lundi:'Lundi',mardi:'Mardi',mercredi:'Mercredi',jeudi:'Jeudi',vendredi:'Vendredi',samedi:'Samedi',dimanche:'Dimanche'};
+  if(!window._rosterSessions) window._rosterSessions={};
+  activeDays.forEach(d=>{ if(!window._rosterSessions[d]) window._rosterSessions[d]=[{id:makeSessId(),type:'volley',endTime:'20:00',duration:90,label:'Séance 1'}]; });
+  Object.keys(window._rosterSessions).forEach(d=>{ if(!activeDays.includes(d)) delete window._rosterSessions[d]; });
+  document.getElementById('roster-days-detail').innerHTML = activeDays.map(day=>`
+    <div class="card" style="padding:12px;margin-top:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="bold" style="font-size:.85rem">${labels[day]}</div>
+        <button class="btn btn-sm btn-ghost" style="padding:5px 10px;font-size:.78rem" onclick="addRosterSession('${day}')">+ Séance</button>
+      </div>
+      <div id="roster-sessions-${day}">${renderRosterSessionsForm(day)}</div>
+    </div>`).join('');
+}
+
+function renderRosterSessionsForm(day){
+  const sessions = window._rosterSessions[day]||[];
+  return sessions.map((s,i)=>`
+    <div style="display:flex;gap:6px;align-items:flex-end;margin-bottom:8px;background:var(--bg);border-radius:8px;padding:8px;flex-wrap:wrap">
+      <div style="flex:1.4;min-width:90px">
+        <label class="form-label" style="font-size:.72rem">Nom séance</label>
+        <input class="form-input" style="padding:6px 8px;font-size:.82rem" value="${escHtml(s.label)}" oninput="updateRosterSession('${day}','${s.id}','label',this.value)">
+      </div>
+      <div style="flex:1;min-width:80px">
+        <label class="form-label" style="font-size:.72rem">Type</label>
+        <select class="form-select" style="padding:6px 8px;font-size:.82rem" onchange="updateRosterSession('${day}','${s.id}','type',this.value)">
+          <option value="volley" ${s.type==='volley'?'selected':''}>🏐 Volley</option>
+          <option value="physique" ${s.type==='physique'?'selected':''}>🏋️ Physique</option>
+        </select>
+      </div>
+      <div style="flex:.7;min-width:60px">
+        <label class="form-label" style="font-size:.72rem">Durée (min)</label>
+        <input type="number" class="form-input" style="padding:6px 8px;font-size:.82rem" value="${s.duration||90}" min="10" max="300" oninput="updateRosterSession('${day}','${s.id}','duration',parseInt(this.value)||90)">
+      </div>
+      <div style="flex:.8;min-width:70px">
+        <label class="form-label" style="font-size:.72rem">Fin</label>
+        <input type="time" class="form-input" style="padding:6px 8px;font-size:.82rem" value="${s.endTime}" oninput="updateRosterSession('${day}','${s.id}','endTime',this.value)">
+      </div>
+      ${sessions.length>1?`<button onclick="removeRosterSession('${day}','${s.id}')" style="background:var(--danger);color:#fff;border:none;border-radius:8px;padding:7px 10px;font-size:.85rem;cursor:pointer;flex-shrink:0">✕</button>`:''}
+    </div>`).join('');
+}
+
+function addRosterSession(day){
+  if(!window._rosterSessions[day]) window._rosterSessions[day]=[];
+  const n = window._rosterSessions[day].length+1;
+  window._rosterSessions[day].push({id:makeSessId(),type:'volley',endTime:'20:00',duration:90,label:'Séance '+n});
+  document.getElementById('roster-sessions-'+day).innerHTML=renderRosterSessionsForm(day);
+}
+function removeRosterSession(day,sid){
+  window._rosterSessions[day]=window._rosterSessions[day].filter(s=>s.id!==sid);
+  document.getElementById('roster-sessions-'+day).innerHTML=renderRosterSessionsForm(day);
+}
+function updateRosterSession(day,sid,field,val){
+  const s=window._rosterSessions[day]?.find(x=>x.id===sid);
+  if(s) s[field]=val;
+}
+
+function addRoster(){
+  const raw = document.getElementById('roster-names').value.trim();
+  if(!raw){ alert('Entrez au moins un nom.'); return; }
+  const names = raw.split('\n').map(n=>n.trim()).filter(n=>n.length>0);
+  if(!names.length){ alert('Entrez au moins un nom.'); return; }
+
+  const equipe = document.getElementById('roster-equipe').value||'A';
+  const morningTime = document.getElementById('roster-morning').value||'08:00';
+  const activeDays = Array.from(document.querySelectorAll('#roster-days .toggle-day.active')).map(b=>b.dataset.day);
+  const allDays = ['lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche'];
+
+  // Construit le planning commun
+  const templateDays = {};
+  allDays.forEach(d=>{
+    const active = activeDays.includes(d);
+    if(active && window._rosterSessions && window._rosterSessions[d]){
+      const sessions = window._rosterSessions[d];
+      templateDays[d] = {active:true, type:sessions[0]?.type||'volley', endTime:sessions[0]?.endTime||'20:00', sessions};
+    } else {
+      templateDays[d] = {active:false, type:'volley', endTime:'20:00'};
+    }
+  });
+
+  // Vérifie les doublons
+  const existing = getPlayers();
+  const existingNames = new Set(existing.map(p=>p.name.toLowerCase()));
+  const duplicates = names.filter(n=>existingNames.has(n.toLowerCase()));
+  if(duplicates.length > 0){
+    if(!confirm(`⚠️ ${duplicates.length} nom(s) déjà existant(s) :\n${duplicates.join(', ')}\n\nLes ajouter quand même ?`)) return;
+  }
+
+  // Crée les joueuses
+  const newPlayers = names.map((name,i)=>{
+    // Deep copy des sessions avec nouveaux IDs pour chaque joueuse
+    const playerDays = {};
+    allDays.forEach(d=>{
+      playerDays[d] = JSON.parse(JSON.stringify(templateDays[d]));
+      if(playerDays[d].sessions){
+        playerDays[d].sessions.forEach(s=>{ s.id = makeSessId(); });
+      }
+    });
+    return {
+      id: (Date.now() + i).toString(),
+      name,
+      equipe,
+      morningTime,
+      trainingDays: playerDays,
+      notifEnabled: true
+    };
+  });
+
+  const allPlayers = [...existing, ...newPlayers];
+  savePlayers(allPlayers);
+
+  // Reset le formulaire
+  document.getElementById('roster-names').value = '';
+  document.querySelectorAll('#roster-days .toggle-day').forEach(b=>b.classList.remove('active'));
+  document.getElementById('roster-days-detail').innerHTML = '';
+  document.getElementById('roster-template-player').value = '';
+  window._rosterSessions = {};
+
+  renderPlayersConfig();
+  populateRosterTemplateDropdown();
+  alert(`✅ ${newPlayers.length} joueuse${newPlayers.length>1?'s':''} ajoutée${newPlayers.length>1?'s':''} !\n${newPlayers.map(p=>p.name).join(', ')}`);
+}
 function togglePlayerNotif(pid){
   const players = getPlayers();
   const p = players.find(x=>x.id===pid);
@@ -2238,6 +2724,7 @@ function togglePlayerNotif(pid){
   }
 
   DB.set('players', players);
+  if(_syncReady) players.forEach(p2 => syncToCloud('players', p2.id, p2));
   renderPlayersConfig();
 
   const status = p.notifEnabled ? '🔔 Notifications activées' : '🔕 Notifications désactivées';
@@ -2395,7 +2882,9 @@ function saveEditPlayer(){
   const resp = getResponses();
   resp.forEach(r=>{ if(r.playerId===_editPlayerId) r.playerName=name; });
   DB.set('responses', resp);
-  DB.set('players', players);
+  // Sync renamed responses to cloud
+  if(_syncReady) resp.filter(r=>r.playerId===_editPlayerId).slice(0,50).forEach(r=>syncToCloud('responses',r.id,r));
+  savePlayers(players);
   window._editSessions = {};
   alert(`✅ ${name} modifiée !`);
   showScreen('dashboard');
@@ -2407,8 +2896,8 @@ async function changePin(){
   const hashed = await hashPin(v);
   const s=getSettings();
   s.pinHash=hashed;
-  delete s.pin; // supprime l'ancien PIN en clair
-  DB.set('settings',s);
+  delete s.pin;
+  saveConfig('settings',s);
   document.getElementById('new-pin').value='';
   alert('✅ PIN modifié et sécurisé !');
 }
@@ -2460,7 +2949,7 @@ function saveNotifSettings(){
   const postDelay = parseInt(document.getElementById('notif-post-delay')?.value)||15;
   const repeatInterval = Math.max(5, parseInt(document.getElementById('notif-repeat-interval')?.value)||10);
   const stopAfterHours = Math.max(1, parseInt(document.getElementById('notif-stop-after')?.value)||2);
-  DB.set('notifSettings', {postDelay, repeatInterval, stopAfterHours});
+  saveConfig('notifSettings', {postDelay, repeatInterval, stopAfterHours});
   alert('✅ Réglages notifications enregistrés !');
 }
 function loadNotifSettingsUI(){
@@ -3176,10 +3665,12 @@ function logoutStaff(){
    INIT
    ========================================================== */
 document.addEventListener('DOMContentLoaded',async()=>{
+  await initFirestore();
   await requestNotifPermission();
   scheduleNotifications();
   scheduleStaffDigestNotif();
   updateNotifStatus();
+  updateSyncStatusUI();
   // init qconfig if not set
   if(!localStorage.getItem('qconfig')) DB.set('qconfig',DEFAULT_QCONFIG());
   document.addEventListener('visibilitychange',()=>{if(!document.hidden){ scheduleNotifications(); scheduleStaffDigestNotif(); }});
