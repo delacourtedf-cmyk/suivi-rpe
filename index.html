@@ -2966,9 +2966,14 @@ function loadNotifSettingsUI(){
 // PUSH CONFIG — Remplacez par vos valeurs Firebase
 // ══════════════════════════════════════════════
 const PUSH_CONFIG = {
-  serverUrl: '',   // Ex: 'https://us-central1-rpe-suivi-push.cloudfunctions.net'
-  vapidPublicKey: '', // Votre clé publique VAPID
-  enabled: false   // Passez à true une fois Firebase configuré
+  subscribeUrl: 'https://subscribe-z2hvajvauq-uc.a.run.app',
+  unsubscribeUrl: 'https://us-central1-rpe-suivi-push.cloudfunctions.net/unsubscribe',
+  markRespondedUrl: 'https://us-central1-rpe-suivi-push.cloudfunctions.net/markResponded',
+  sendTestPushUrl: 'https://us-central1-rpe-suivi-push.cloudfunctions.net/sendTestPush',
+  sendTrainingPushUrl: 'https://us-central1-rpe-suivi-push.cloudfunctions.net/sendTrainingPush',
+  getStatusUrl: 'https://us-central1-rpe-suivi-push.cloudfunctions.net/getStatus',
+  vapidPublicKey: 'BEbFIklrrXkkLtWi673IlS1IsYD5FTT0r-NdVZD9HwnaNHH8ad8YrN5pfaJVat6wDpg40sz2MoaZy-sqhE7L_Ao',
+  enabled: true
 };
 
 function urlBase64ToUint8Array(base64String){
@@ -2999,7 +3004,7 @@ async function requestNotifPermission(){
 
 // Abonnement push silencieux (sans bloquer l'UI)
 async function subscribePushQuiet(){
-  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.vapidPublicKey || !PUSH_CONFIG.serverUrl) return;
+  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.vapidPublicKey || !PUSH_CONFIG.subscribeUrl) return;
   if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   try{
     const reg = await navigator.serviceWorker.ready;
@@ -3019,11 +3024,11 @@ async function subscribePushQuiet(){
 
 // Envoie la subscription au backend pour une joueuse spécifique
 async function registerPushForPlayer(player){
-  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.serverUrl) return;
+  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.subscribeUrl) return;
   const sub = DB.get('pushSubscription');
   if(!sub) return;
   try{
-    await fetch(PUSH_CONFIG.serverUrl+'/subscribe',{
+    await fetch(PUSH_CONFIG.subscribeUrl,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -3041,9 +3046,9 @@ async function registerPushForPlayer(player){
 
 // Signale au backend qu'une joueuse a répondu (stoppe les relances)
 async function markRespondedOnServer(playerId, type){
-  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.serverUrl) return;
+  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.subscribeUrl) return;
   try{
-    await fetch(PUSH_CONFIG.serverUrl+'/markResponded',{
+    await fetch(PUSH_CONFIG.markRespondedUrl,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({ playerId, type })
@@ -3055,12 +3060,12 @@ async function markRespondedOnServer(playerId, type){
 
 // Test push depuis le dashboard staff
 async function testPushForPlayer(playerId){
-  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.serverUrl){
+  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.subscribeUrl){
     alert('⚠️ Push backend non configuré.\nModifiez PUSH_CONFIG dans index.html.');
     return;
   }
   try{
-    const resp = await fetch(PUSH_CONFIG.serverUrl+'/sendTestPush',{
+    const resp = await fetch(PUSH_CONFIG.sendTestPushUrl,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({ playerId })
