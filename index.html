@@ -3141,11 +3141,39 @@ function cancelReminder(pid,type,session=null){
   const lkey=`${pid}-${type}-${session?.id||'main'}-loop`;
   if(reminderTimers[lkey]){clearInterval(reminderTimers[lkey]);delete reminderTimers[lkey];}
 }
-function sendNotif(player,type){
+function sendNotif(player,type,session){
+  // === PUSH SERVEUR (fonctionne même app fermée) ===
+  if(PUSH_CONFIG.enabled && type==='training' && PUSH_CONFIG.sendTrainingPushUrl){
+    // Évite les doublons : max 1 push serveur par joueur/session/jour
+    const pushKey = `push-sent-${player.id}-${type}-${session?.id||'main'}-${todayKey()}`;
+    if(!window._pushSentFlags) window._pushSentFlags={};
+    if(!window._pushSentFlags[pushKey]){
+      window._pushSentFlags[pushKey]=true;
+      fetch(PUSH_CONFIG.sendTrainingPushUrl,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          playerIds:[player.id],
+          sessionLabel: session?.label || 'séance'
+        })
+      }).then(r=>r.json()).then(d=>{
+        console.log(`[Push Serveur] Training push envoyé pour ${player.name}:`,d);
+      }).catch(err=>{
+        console.error(`[Push Serveur] Erreur training push ${player.name}:`,err);
+        // Reset le flag pour pouvoir réessayer
+        delete window._pushSentFlags[pushKey];
+      });
+    }
+  }
+  if(PUSH_CONFIG.enabled && type==='morning' && PUSH_CONFIG.sendTrainingPushUrl){
+    // Le matin est déjà géré par le cron Firebase, pas besoin de push local en double
+    // On ne fait que la notif locale comme backup si l'app est ouverte
+  }
+
+  // === NOTIFICATION LOCALE (backup si app ouverte) ===
   if(Notification.permission!=='granted') return;
   const title=type==='morning'?`🌅 Bien-être – ${firstName(player.name)}`:`💪 Charge séance – ${firstName(player.name)}`;
   const body =type==='morning'?'N\'oubliez pas votre questionnaire matinal !':'Évaluez votre séance d\'entraînement !';
-  // Utilise le Service Worker si disponible (mobile/PWA), sinon Notification directe
   if('serviceWorker' in navigator && navigator.serviceWorker.controller){
     navigator.serviceWorker.ready.then(reg=>{
       reg.showNotification(title,{body,tag:`${player.id}-${type}`,requireInteraction:true,icon:'https://delacourtedf-cmyk.github.io/suivi-rpe/icon.png'});
