@@ -1032,6 +1032,7 @@ function DEFAULT_QCONFIG(){
    STATE
    ========================================================== */
 let currentPlayer   = null;
+let _isStaffSession = false;
 let currentQType    = null;
 let currentSession  = null;
 let questAnswers    = {};
@@ -1123,8 +1124,11 @@ function renderPlayerList(){
 function selectPlayer(pid){
   currentPlayer = getPlayers().find(p=>p.id===pid);
   if(!currentPlayer) return;
-  // Enregistre la subscription push pour cette joueuse
-  registerPushForPlayer(currentPlayer);
+  // N'enregistre le push que si c'est la joueuse elle-même (pas le staff qui consulte)
+  if(!_isStaffSession){
+    registerPushForPlayer(currentPlayer);
+    scheduleNotifications(); // Programme les rappels locaux pour cette joueuse
+  }
   const today = todayKey();
   const resp  = getResponses();
   const days7 = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
@@ -1307,6 +1311,7 @@ async function checkPin(){
       saveConfig('settings', settings);
     }
     // Auto-logout after 30 min inactivity
+    _isStaffSession = true;
     resetStaffTimeout();
     showScreen('dashboard');
     setDashboardDate(0);
@@ -1334,6 +1339,7 @@ function resetStaffTimeout(){
   _staffTimer = setTimeout(()=>{
     if(document.getElementById('screen-dashboard').classList.contains('active')||
        document.getElementById('screen-player-report').classList.contains('active')){
+      _isStaffSession = false;
       showScreen('home');
       alert('⏱️ Session expirée après 30 minutes d\'inactivité.');
     }
@@ -3004,8 +3010,18 @@ async function requestNotifPermission(){
 
 // Abonnement push silencieux (sans bloquer l'UI)
 async function subscribePushQuiet(){
-  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.vapidPublicKey || !PUSH_CONFIG.subscribeUrl) return;
-  if(!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.vapidPublicKey || !PUSH_CONFIG.subscribeUrl){
+    console.warn('[Push] Config incomplète, abonnement ignoré');
+    return;
+  }
+  if(!('serviceWorker' in navigator)){
+    console.warn('[Push] Service Worker non supporté — l\'app doit être installée sur l\'écran d\'accueil');
+    return;
+  }
+  if(!('PushManager' in window)){
+    console.warn('[Push] PushManager non disponible — l\'app doit être installée sur l\'écran d\'accueil (iOS 16.4+)');
+    return;
+  }
   try{
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
@@ -3014,11 +3030,14 @@ async function subscribePushQuiet(){
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(PUSH_CONFIG.vapidPublicKey)
       });
+      console.log('[Push] Nouvel abonnement push créé ✓');
+    } else {
+      console.log('[Push] Abonnement push existant récupéré ✓');
     }
     // Stocke la subscription localement pour l'envoyer au backend quand on connaît le playerId
     DB.set('pushSubscription', sub.toJSON());
   } catch(e){
-    console.warn('[Push] Abonnement push échoué:', e.message);
+    console.warn('[Push] Abonnement push échoué:', e.message, '— Vérifiez que l\'app est sur l\'écran d\'accueil et que les notifications sont autorisées');
   }
 }
 
@@ -3026,9 +3045,12 @@ async function subscribePushQuiet(){
 async function registerPushForPlayer(player){
   if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.subscribeUrl) return;
   const sub = DB.get('pushSubscription');
-  if(!sub) return;
+  if(!sub){
+    console.warn('[Push] Pas de subscription push locale — l\'app doit être sur l\'écran d\'accueil avec notifs autorisées');
+    return;
+  }
   try{
-    await fetch(PUSH_CONFIG.subscribeUrl,{
+    const resp = await fetch(PUSH_CONFIG.subscribeUrl,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -3038,9 +3060,13 @@ async function registerPushForPlayer(player){
         subscription: sub
       })
     });
-    console.log('[Push] Joueuse inscrite:', player.name);
+    if(resp.ok){
+      console.log('[Push] ✅ Joueuse inscrite au push:', player.name);
+    } else {
+      console.error('[Push] ❌ Erreur serveur subscribe:', resp.status, await resp.text().catch(()=>''));
+    }
   } catch(e){
-    console.warn('[Push] Erreur inscription:', e.message);
+    console.warn('[Push] ❌ Erreur réseau inscription:', e.message);
   }
 }
 
@@ -3078,34 +3104,33 @@ async function testPushForPlayer(playerId){
   }
 }
 function scheduleNotifications(){
-  const players=getPlayers();
+  // Ne programme PAS de notifs locales si on est en mode staff ou si aucune joueuse n'est sélectionnée
+  if(_isStaffSession || !currentPlayer) return;
   const today=todayKey();
   const resp=getResponses();
   const days7=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
   const todayN=days7[new Date().getDay()];
   const notifCfg=getNotifSettings();
-  players.forEach(p=>{
-    // Respecte le flag notifEnabled par joueuse
-    if(p.notifEnabled===false) return;
-    if(!resp.some(r=>r.playerId===p.id&&r.date===today&&r.type==='morning')){
-      const [h,m]=(p.morningTime||'08:00').split(':').map(Number);
-      scheduleReminder(p,'morning',h,m);
-    }
-    if(p.trainingDays?.[todayN]?.active){
-      const dayCfg=p.trainingDays[todayN];
-      const sessions=dayCfg.sessions||[{id:'s0',type:dayCfg.type||'volley',endTime:dayCfg.endTime||'20:00',label:'Séance'}];
-      sessions.forEach(s=>{
-        if(!resp.some(r=>r.playerId===p.id&&r.date===today&&r.type==='training'&&r.sessionId===s.id)){
-          const [h,m]=(s.endTime||'20:00').split(':').map(Number);
-          // Ajoute le délai post-séance configurable
-          const totalMin = h*60 + m + (notifCfg.postDelay||15);
-          const nh = Math.floor(totalMin/60) % 24;
-          const nm = totalMin % 60;
-          scheduleReminder(p,'training',nh,nm,s);
-        }
-      });
-    }
-  });
+  const p = currentPlayer;
+  // Respecte le flag notifEnabled par joueuse
+  if(p.notifEnabled===false) return;
+  if(!resp.some(r=>r.playerId===p.id&&r.date===today&&r.type==='morning')){
+    const [h,m]=(p.morningTime||'08:00').split(':').map(Number);
+    scheduleReminder(p,'morning',h,m);
+  }
+  if(p.trainingDays?.[todayN]?.active){
+    const dayCfg=p.trainingDays[todayN];
+    const sessions=dayCfg.sessions||[{id:'s0',type:dayCfg.type||'volley',endTime:dayCfg.endTime||'20:00',label:'Séance'}];
+    sessions.forEach(s=>{
+      if(!resp.some(r=>r.playerId===p.id&&r.date===today&&r.type==='training'&&r.sessionId===s.id)){
+        const [h,m]=(s.endTime||'20:00').split(':').map(Number);
+        const totalMin = h*60 + m + (notifCfg.postDelay||15);
+        const nh = Math.floor(totalMin/60) % 24;
+        const nm = totalMin % 60;
+        scheduleReminder(p,'training',nh,nm,s);
+      }
+    });
+  }
 }
 function scheduleReminder(player,type,hour,minute,session=null){
   const now=new Date(),target=new Date();
@@ -3689,6 +3714,7 @@ function scheduleStaffDigestNotif(){
 function logoutStaff(){
   if(_staffTimer) clearTimeout(_staffTimer);
   _staffTimer = null;
+  _isStaffSession = false;
   ['p1','p2','p3','p4'].forEach(id=>document.getElementById(id).value='');
   showScreen('home');
 }
