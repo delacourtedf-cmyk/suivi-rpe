@@ -2548,8 +2548,10 @@ function renderPlayersConfig(){
     </div>`;
   }).join('');
 }
-function deletePlayer(pid){
+async function deletePlayer(pid){
   if(!confirm('Supprimer cette joueuse ? Ses données seront conservées.')) return;
+  const player = getPlayers().find(p=>p.id===pid);
+  if(player) await unsubscribePlayerPush(player); // coupe le push serveur avant de retirer la fiche
   savePlayers(getPlayers().filter(p=>p.id!==pid));
   deletePlayerFromCloud(pid);
   renderPlayersConfig();
