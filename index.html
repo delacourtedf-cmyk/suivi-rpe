@@ -276,7 +276,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <p class="text-muted" style="font-size:.72rem;margin-top:8px" id="notif-status-home"></p>
     <p style="font-size:.72rem;margin-top:4px" id="sync-status"></p>
   </div>
-  <div id="install-warning" style="display:none;max-width:420px;margin:0 auto;padding:0 16px"></div>
 </div>
 
 <!-- ======== PLAYER SELECT ======== -->
@@ -479,7 +478,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
   <!-- TAB JOUEUSES -->
   <div id="tab-joueuses" class="hidden">
-    <div id="push-status-panel"></div>
     <div id="joueuses-list"></div>
   </div>
 
@@ -1106,6 +1104,7 @@ function renderPlayerList(){
     const tDone = responses.some(r=>r.playerId===p.id&&r.date===today&&r.type==='training');
     const hasT  = p.trainingDays?.[todayName]?.active;
     const sType = p.trainingDays?.[todayName]?.type==='physique'?'🏋️':'🏐';
+    const notifOnRow = p.notifEnabled !== false;
     return `
     <div class="player-item" onclick="selectPlayer('${p.id}')">
       <div style="display:flex;align-items:center;gap:12px">
@@ -1118,16 +1117,60 @@ function renderPlayerList(){
           </div>
         </div>
       </div>
-      <span style="color:var(--muted);font-size:1.2rem">›</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn-sm btn-ghost" style="padding:6px 9px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:.95rem;line-height:1" title="${notifOnRow?'Désactiver mes notifications':'Réactiver mes notifications'}" onclick="event.stopPropagation();toggleMyNotifications('${p.id}')">${notifOnRow?'🔔':'🔕'}</button>
+        <span style="color:var(--muted);font-size:1.2rem">›</span>
+      </div>
     </div>`;
   }).join('');
+}
+
+/* ==========================================================
+   DÉSABONNEMENT SELF-SERVICE (joueuse)
+   Permet à chaque joueuse de couper ses propres notifications
+   depuis l'écran de sélection, sans passer par le staff.
+   ========================================================== */
+async function toggleMyNotifications(pid){
+  const players = getPlayers();
+  const p = players.find(x=>x.id===pid);
+  if(!p) return;
+  const wasOn = p.notifEnabled !== false;
+  p.notifEnabled = !wasOn;
+  if(currentPlayer && currentPlayer.id===pid) currentPlayer.notifEnabled = p.notifEnabled;
+
+  if(wasOn){
+    // Désactivation : coupe le serveur, l'abonnement navigateur et les rappels locaux
+    unsubscribePlayerPush(p);
+    cancelReminder(p.id,'morning');
+    Object.values(p.trainingDays||{}).forEach(day=>{
+      (day.sessions||[]).forEach(s=>cancelReminder(p.id,'training',s));
+    });
+    try{
+      if('serviceWorker' in navigator){
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if(sub){
+          await sub.unsubscribe();
+          DB.set('pushSubscription', null);
+        }
+      }
+    } catch(e){ console.warn('[Push] Erreur désabonnement navigateur:', e.message); }
+  } else {
+    // Réactivation
+    registerPushForPlayer(p);
+    if(currentPlayer && currentPlayer.id===pid) scheduleNotifications();
+  }
+
+  savePlayers(players);
+  renderPlayerList();
+  alert(p.notifEnabled ? `🔔 Notifications réactivées pour ${p.name}` : `🔕 Notifications désactivées pour ${p.name}.\nVous ne recevrez plus de rappels sur cet appareil.`);
 }
 
 function selectPlayer(pid){
   currentPlayer = getPlayers().find(p=>p.id===pid);
   if(!currentPlayer) return;
-  // N'enregistre le push que si c'est la joueuse elle-même (ni en session staff, ni sur un appareil staff)
-  if(!_isStaffSession && !DB.get('isStaffDevice')){
+  // N'enregistre le push que si c'est la joueuse elle-même (pas le staff qui consulte)
+  if(!_isStaffSession){
     registerPushForPlayer(currentPlayer);
     scheduleNotifications(); // Programme les rappels locaux pour cette joueuse
   }
@@ -1314,7 +1357,6 @@ async function checkPin(){
     }
     // Auto-logout after 30 min inactivity
     _isStaffSession = true;
-    DB.set('isStaffDevice', true); // Marque cet appareil comme appareil staff (permanent)
     resetStaffTimeout();
     showScreen('dashboard');
     setDashboardDate(0);
@@ -1370,7 +1412,7 @@ function switchTab(tab){
     t.classList.toggle('active',['rapport','alertes','joueuses','config'][i]===tab);
   });
   if(tab==='alertes')  { renderSmartAlerts(); renderDailyDigest(); renderAlertsHistory(); }
-  if(tab==='joueuses') { renderJoueusesTab(); renderSubscriptionStatus(); }
+  if(tab==='joueuses') renderJoueusesTab();
   if(tab==='config')   renderConfigTab();
 }
 function loadDashboard(){
@@ -2143,58 +2185,6 @@ function renderJoueusesTab(){
     </div>`;
   }).join('');
 }
-// Affiche l'état des abonnements push (qui reçoit vraiment les notifications)
-async function renderSubscriptionStatus(){
-  const panel = document.getElementById('push-status-panel');
-  if(!panel) return;
-  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.getStatusUrl){
-    panel.innerHTML = '';
-    return;
-  }
-  panel.innerHTML = '<div class="card"><p class="text-muted" style="font-size:.85rem">⏳ Vérification des abonnements…</p></div>';
-  try{
-    const resp = await fetch(PUSH_CONFIG.getStatusUrl);
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
-    const data = await resp.json();
-    const summary = data.summary || [];
-    const subscribedIds = new Set(summary.map(s=>String(s.playerId)));
-    const allPlayers = getPlayers();
-    const notSubscribed = allPlayers.filter(p=>!subscribedIds.has(String(p.id)));
-    const subCount = allPlayers.length - notSubscribed.length;
-
-    // Lignes : qui a répondu ce matin
-    const rows = summary.map(s=>{
-      const mOk = s.morning?.responded;
-      const tOk = s.training?.responded;
-      const mAtt = s.morning?.attempts||0;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
-        <span class="bold" style="font-size:.85rem">${escHtml(s.playerName||'?')}</span>
-        <span style="font-size:.8rem">${mOk?'✅ matin':(mAtt?`🔔 relancée ${mAtt}×`:'⏳ matin')} </span>
-      </div>`;
-    }).join('');
-
-    const notSubHtml = notSubscribed.length
-      ? `<div class="alert alert-warning mt-12" style="font-size:.82rem">
-           <strong>⚠️ ${notSubscribed.length} joueuse${notSubscribed.length>1?'s':''} non abonnée${notSubscribed.length>1?'s':''} au push :</strong><br>
-           ${notSubscribed.map(p=>escHtml(p.name)).join(', ')}<br>
-           <span class="text-muted">Elles doivent ouvrir l'app (installée sur l'écran d'accueil) et se sélectionner.</span>
-         </div>`
-      : `<div class="alert alert-success mt-12" style="font-size:.82rem">✅ Toutes les joueuses sont abonnées au push.</div>`;
-
-    panel.innerHTML = `<div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <h3 style="margin:0">🔔 État des notifications</h3>
-        <button class="btn btn-outline btn-sm" onclick="renderSubscriptionStatus()">↻</button>
-      </div>
-      <p class="text-muted mb-8" style="font-size:.8rem">${subCount}/${allPlayers.length} abonnée${allPlayers.length>1?'s':''} · statut des réponses du jour</p>
-      ${rows||'<p class="text-muted" style="font-size:.8rem">Aucune réponse enregistrée aujourd\'hui.</p>'}
-      ${notSubHtml}
-    </div>`;
-  } catch(e){
-    panel.innerHTML = `<div class="card"><p class="text-muted" style="font-size:.82rem">❌ Impossible de récupérer l'état des abonnements (${escHtml(e.message)}).</p></div>`;
-  }
-}
-
 function showPlayerReport(pid){
   window._reportPlayerId = pid;
   const player = getPlayers().find(p=>p.id===pid);
@@ -2791,16 +2781,24 @@ function togglePlayerNotif(pid){
   alert(`${status} pour ${p.name}`);
 }
 
-// Placeholder pour l'appel serveur — à connecter quand le backend Firebase sera en place
-function unsubscribePlayerPush(player){
-  // TODO: Quand le backend est en place, appeler :
-  // fetch('https://ton-serveur.com/api/unsubscribe', {
-  //   method: 'POST',
-  //   headers: {'Content-Type':'application/json'},
-  //   body: JSON.stringify({ playerId: player.id, subscription: player.pushSubscription })
-  // });
-  console.log('[Push] Désabonnement prévu pour', player.name, '— en attente du backend');
+// Prévient le backend qu'il ne doit plus envoyer de push à cette joueuse
+async function unsubscribePlayerPush(player){
   player.pushSubscription = null;
+  if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.unsubscribeUrl) return;
+  try{
+    const resp = await fetch(PUSH_CONFIG.unsubscribeUrl,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ playerId: player.id })
+    });
+    if(resp.ok){
+      console.log('[Push] ✅ Désabonnement serveur confirmé pour', player.name);
+    } else {
+      console.error('[Push] ❌ Erreur serveur unsubscribe:', resp.status, await resp.text().catch(()=>''));
+    }
+  } catch(e){
+    console.warn('[Push] ❌ Erreur réseau désabonnement:', e.message);
+  }
 }
 // === FIN GESTION NOTIFICATIONS ===
 
@@ -3091,12 +3089,6 @@ async function subscribePushQuiet(){
     }
     // Stocke la subscription localement pour l'envoyer au backend quand on connaît le playerId
     DB.set('pushSubscription', sub.toJSON());
-    // Si cet appareil appartient déjà à une joueuse, on rafraîchit son inscription (survit aux renouvellements)
-    const myId = DB.get('myPlayerId');
-    if(myId && !_isStaffSession){
-      const player = getPlayers().find(p=>String(p.id)===String(myId));
-      if(player) registerPushForPlayer(player);
-    }
   } catch(e){
     console.warn('[Push] Abonnement push échoué:', e.message, '— Vérifiez que l\'app est sur l\'écran d\'accueil et que les notifications sont autorisées');
   }
@@ -3105,6 +3097,10 @@ async function subscribePushQuiet(){
 // Envoie la subscription au backend pour une joueuse spécifique
 async function registerPushForPlayer(player){
   if(!PUSH_CONFIG.enabled || !PUSH_CONFIG.subscribeUrl) return;
+  if(player.notifEnabled===false){
+    console.log('[Push] Notifications désactivées pour', player.name, '— pas de réabonnement');
+    return;
+  }
   const sub = DB.get('pushSubscription');
   if(!sub){
     console.warn('[Push] Pas de subscription push locale — l\'app doit être sur l\'écran d\'accueil avec notifs autorisées');
@@ -3122,7 +3118,6 @@ async function registerPushForPlayer(player){
       })
     });
     if(resp.ok){
-      DB.set('myPlayerId', player.id); // l'appareil se souvient de sa joueuse (pour le renouvellement auto)
       console.log('[Push] ✅ Joueuse inscrite au push:', player.name);
     } else {
       console.error('[Push] ❌ Erreur serveur subscribe:', resp.status, await resp.text().catch(()=>''));
@@ -3166,8 +3161,8 @@ async function testPushForPlayer(playerId){
   }
 }
 function scheduleNotifications(){
-  // Ne programme PAS de notifs locales si on est en mode staff, sur un appareil staff, ou si aucune joueuse n'est sélectionnée
-  if(_isStaffSession || DB.get('isStaffDevice') || !currentPlayer) return;
+  // Ne programme PAS de notifs locales si on est en mode staff ou si aucune joueuse n'est sélectionnée
+  if(_isStaffSession || !currentPlayer) return;
   const today=todayKey();
   const resp=getResponses();
   const days7=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
@@ -3276,34 +3271,6 @@ function updateNotifStatus(){
   el.textContent=Notification.permission==='granted'?'🔔 Notifications activées':'🔕 Notifications désactivées — cliquez pour activer';
   el.style.cursor=Notification.permission!=='granted'?'pointer':'default';
   el.onclick=Notification.permission!=='granted'?async()=>{await requestNotifPermission();updateNotifStatus();}:null;
-}
-
-// Détecte si l'app est installée sur l'écran d'accueil (indispensable pour le push iOS)
-function isAppInstalled(){
-  return window.navigator.standalone === true
-      || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-}
-function isIOS(){
-  return /iphone|ipad|ipod/i.test(navigator.userAgent)
-      || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
-}
-// Affiche un avertissement si l'app n'est pas installée (sinon le push ne marchera pas)
-function checkInstallStatus(){
-  const box = document.getElementById('install-warning');
-  if(!box) return;
-  if(isAppInstalled()){ box.style.display='none'; return; }
-  // Pas installée → on prévient (surtout sur mobile)
-  const onMobile = isIOS() || /android/i.test(navigator.userAgent);
-  if(!onMobile){ box.style.display='none'; return; }
-  const howTo = isIOS()
-    ? 'Appuyez sur l\'icône <strong>Partager</strong> (carré avec flèche ↑) puis <strong>« Sur l\'écran d\'accueil »</strong>.'
-    : 'Menu <strong>⋮</strong> de Chrome puis <strong>« Ajouter à l\'écran d\'accueil »</strong>.';
-  box.innerHTML = `<div class="alert alert-warning" style="font-size:.82rem;text-align:left">
-    <strong>⚠️ Pour recevoir les rappels</strong><br>
-    Ajoutez d'abord l'app à votre écran d'accueil, sinon les notifications ne fonctionneront pas.<br>
-    <span class="text-muted">${howTo}</span>
-  </div>`;
-  box.style.display='block';
 }
 
 /* ==========================================================
@@ -3818,32 +3785,11 @@ document.addEventListener('DOMContentLoaded',async()=>{
   scheduleNotifications();
   scheduleStaffDigestNotif();
   updateNotifStatus();
-  checkInstallStatus();
-  listenPushRenewal();
   updateSyncStatusUI();
   // init qconfig if not set
   if(!localStorage.getItem('qconfig')) DB.set('qconfig',DEFAULT_QCONFIG());
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden){ scheduleNotifications(); scheduleStaffDigestNotif(); checkInstallStatus(); }});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden){ scheduleNotifications(); scheduleStaffDigestNotif(); }});
 });
-
-// Feature 3 — Renouvellement auto de l'abonnement push
-// Le sw.js envoie un message PUSH_SUBSCRIPTION_CHANGED quand iOS renouvelle l'abonnement.
-// On met à jour la subscription locale et on la renvoie au backend pour la joueuse en cours.
-function listenPushRenewal(){
-  if(!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.addEventListener('message', (event)=>{
-    if(event.data?.type === 'PUSH_SUBSCRIPTION_CHANGED' && event.data.subscription){
-      console.log('[Push] Abonnement renouvelé par iOS, re-synchronisation…');
-      DB.set('pushSubscription', event.data.subscription);
-      // Si une joueuse est sélectionnée et qu'on n'est pas en mode staff, on réenregistre
-      if(!_isStaffSession){
-        const pid = currentPlayer?.id || DB.get('myPlayerId');
-        const player = pid ? getPlayers().find(p=>String(p.id)===String(pid)) : null;
-        if(player) registerPushForPlayer(player);
-      }
-    }
-  });
-}
 </script>
 </body>
 </html>
